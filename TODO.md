@@ -20,6 +20,8 @@
    and optimize parameters
 4. Do some optimizations
     - rename operation action and make it a simple type of size 8
+5. Add thanks to README.md and list all developers that have reported
+   problems with the library.
 
 ## Release v0.7
 
