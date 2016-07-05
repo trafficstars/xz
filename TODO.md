@@ -16,9 +16,9 @@
         3 - 2 and 3
         4 - 2, 3 and 4
     - analyze binary tree implementation in xz
-1. Compare compression ratio with xz tool using comparable parameters
+3. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
-2. Do some optimizations
+4. Do some optimizations
     - rename operation action and make it a simple type of size 8
 
 ## Release v0.7
