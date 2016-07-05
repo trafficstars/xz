@@ -2,14 +2,24 @@
 
 ## Release v0.6
 
-1. Review encoder and check for lzma improvements under xz.
-2. Fix binary tree matcher.
-3. Compare compression ratio with xz tool using comparable parameters
+1. Implement lzmaOptions type for gxz that can parse the LZMA options.
+    - rename MatchAlgorithm MatchFinder and name field MatchFinder
+    - parse options
+    - print options
+    - generate various configs from the option
+    - support it in gxz
+2. change matcher interface suppporting Depth and NiceLength
+    - return multiple matches one longer than the other
+    - adapt current matchers accordingly
+    - implement hash chain with multiple word length
+        2 - only 2
+        3 - 2 and 3
+        4 - 2, 3 and 4
+    - analyze binary tree implementation in xz
+1. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
-4. Do some optimizations
+2. Do some optimizations
     - rename operation action and make it a simple type of size 8
-    - make maxMatches, wordSize parameters
-    - stop searching after a certain length is found (parameter sweetLen)
 
 ## Release v0.7
 
@@ -37,17 +47,6 @@
 3. Resolve all issues.
 4. Define release candidates.
 5. Public announcement.
-
-## Package lzma
-
-### Release v0.6
-
-- Rewrite Encoder into a simple greedy one-op-at-a-time encoder
-  including
-    + simple scan at the dictionary head for the same byte
-    + use the killer byte (requiring matches to get longer, the first
-      test should be the byte that would make the match longer)
-
 
 ## Optimizations
 
