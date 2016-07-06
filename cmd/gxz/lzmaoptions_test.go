@@ -73,3 +73,16 @@ func TestOptionSet_String(t *testing.T) {
 		t.Fatalf("*s is %q; want %q", *s, "foo")
 	}
 }
+
+func TestOptionSet_Action(t *testing.T) {
+	var os optionSet
+	os.Int("a", 3)
+	var act bool
+	os.SetAction("a", func(*option) { act = true })
+	if err := os.Parse("a=0"); err != nil {
+		t.Fatalf("os.Parse(%q) error %s", "a=0", err)
+	}
+	if !act {
+		t.Fatalf("action on a didn't fire")
+	}
+}

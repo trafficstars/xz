@@ -14,11 +14,15 @@ type value interface {
 	Set(string) error
 }
 
+// action should be executed if an option is updated.
+type action func(o *option)
+
 // option keeps information about a specific option.
 type option struct {
 	name         string
 	value        value
 	defaultValue string
+	action       action
 }
 
 // Reset sets the option to its default value.
@@ -276,6 +280,9 @@ func (s *optionSet) Parse(t string) error {
 			s.Reset()
 			return fmt.Errorf("option %s: %s", name, err)
 		}
+		if o.action != nil {
+			o.action(o)
+		}
 	}
 	s.parsed = true
 	return nil
@@ -302,5 +309,15 @@ func (s *optionSet) Var(v value, name string) {
 	if s.options == nil {
 		s.options = make(map[string]*option)
 	}
-	s.options[name] = &option{name, v, v.String()}
+	s.options[name] = &option{name: name, value: v,
+		defaultValue: v.String()}
+}
+
+// SetAction sets an action for an option.
+func (s *optionSet) SetAction(name string, a action) {
+	o, ok := s.options[name]
+	if !ok {
+		panic(fmt.Errorf("option %q not found in SetAction", name))
+	}
+	o.action = a
 }
