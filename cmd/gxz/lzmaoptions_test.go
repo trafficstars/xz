@@ -86,3 +86,20 @@ func TestOptionSet_Action(t *testing.T) {
 		t.Fatalf("action on a didn't fire")
 	}
 }
+
+func TestLZMAOptions_Set(t *testing.T) {
+	o := newLZMAOptions()
+	s := o.String()
+	if s != "" {
+		t.Fatalf("o.String() returned %q; want %q", s, "")
+	}
+	arg := "preset=7,dict=1KiB,mf=bt3"
+	if err := o.Set(arg); err != nil {
+		t.Fatalf("o.Set(%q) error %s", arg, err)
+	}
+	s = o.String()
+	if s != arg {
+		t.Fatalf("o.String() returned %q; want %q", s, arg)
+	}
+	t.Logf("o.String() %q", s)
+}

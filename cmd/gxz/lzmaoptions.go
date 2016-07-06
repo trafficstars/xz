@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"regexp"
@@ -320,4 +321,136 @@ func (s *optionSet) SetAction(name string, a action) {
 		panic(fmt.Errorf("option %q not found in SetAction", name))
 	}
 	o.action = a
+}
+
+type lzmaOptions struct {
+	preset  int
+	dictCap int64
+	lc      int
+	lp      int
+	pb      int
+	mf      string
+	mode    string
+	niceLen int
+	depth   int
+}
+
+func newLZMAOptions() *lzmaOptions {
+	return new(lzmaOptions).applyPreset(6)
+}
+
+// preset sets the options to a specfic preset.
+func (o *lzmaOptions) applyPreset(preset int) *lzmaOptions {
+	if !(0 <= preset && preset <= 9) {
+		panic(fmt.Errorf("preset %d unsupported", preset))
+	}
+	*o = lzmaOptions{
+		preset:  preset,
+		dictCap: 1 << lzmaDictCapExps[preset],
+		lc:      3,
+		lp:      0,
+		pb:      2,
+	}
+	// match finder
+	switch preset {
+	case 0:
+		o.mf = "hc3"
+	case 1, 2, 3:
+		o.mf = "hc4"
+	default:
+		o.mf = "bt4"
+	}
+	// mode
+	if preset <= 3 {
+		o.mode = "fast"
+	} else {
+		o.mode = "normal"
+	}
+	// niceLen
+	switch preset {
+	case 0, 1:
+		o.niceLen = 128
+	case 2, 3:
+		o.niceLen = 273
+	case 4:
+		o.niceLen = 16
+	case 5:
+		o.niceLen = 32
+	default:
+		o.niceLen = 64
+	}
+	// depth
+	switch preset {
+	case 0:
+		o.depth = 4
+	case 1:
+		o.depth = 8
+	case 2:
+		o.depth = 24
+	case 3:
+		o.depth = 48
+	}
+	return o
+}
+
+func (o *lzmaOptions) Set(s string) error {
+	var opts optionSet
+	opts.IntVar(&o.preset, "preset", o.preset)
+	opts.Int64ExtVar(&o.dictCap, "dict", o.dictCap)
+	opts.IntVar(&o.lc, "lc", o.lc)
+	opts.IntVar(&o.lp, "lp", o.lp)
+	opts.IntVar(&o.pb, "pb", o.pb)
+	opts.StringVar(&o.mf, "mf", o.mf)
+	opts.StringVar(&o.mode, "mode", o.mode)
+	opts.IntVar(&o.niceLen, "nice", o.niceLen)
+	opts.IntVar(&o.depth, "depth", o.depth)
+	opts.SetAction("preset", func(*option) { o.applyPreset(o.preset) })
+	if err := opts.Parse(s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *lzmaOptions) Update() {
+	panic("unexpected update")
+}
+
+func (o *lzmaOptions) Get() interface{} { return *o }
+
+func (o *lzmaOptions) String() string {
+	var buf bytes.Buffer
+	if o.preset != 6 {
+		fmt.Fprintf(&buf, "preset=%d,", o.preset)
+	}
+	p := new(lzmaOptions).applyPreset(o.preset)
+	if o.dictCap != p.dictCap {
+		fmt.Fprintf(&buf, "dict=%s,",
+			(*int64ExtValue)(&o.dictCap).String())
+	}
+	if o.lc != p.lc {
+		fmt.Fprintf(&buf, "lc=%d,", o.lc)
+	}
+	if o.lp != p.lp {
+		fmt.Fprintf(&buf, "lp=%d,", o.lp)
+	}
+	if o.pb != p.pb {
+		fmt.Fprintf(&buf, "pb=%d,", o.pb)
+	}
+	if o.mf != p.mf {
+		fmt.Fprintf(&buf, "mf=%s,", o.mf)
+	}
+	if o.mode != p.mode {
+		fmt.Fprintf(&buf, "mode=%s,", o.mode)
+	}
+	if o.niceLen != p.niceLen {
+		fmt.Fprintf(&buf, "nice=%d,", o.niceLen)
+	}
+	if o.depth != p.depth {
+		fmt.Fprintf(&buf, "depth=%d,", o.depth)
+	}
+	s := buf.String()
+	if len(s) > 0 && s[len(s)-1] == ',' {
+		s = s[:len(s)-1]
+	}
+	return s
 }
