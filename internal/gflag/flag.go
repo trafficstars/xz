@@ -68,12 +68,23 @@ type Value interface {
 	String() string
 }
 
+// Action to be called after flag updates.
+type Action func(f *Flag)
+
 // Flag represents a single flag.
 type Flag struct {
 	Name       string
 	Shorthands string
 	HasArg     HasArg
 	Value      Value
+	Action     Action
+}
+
+// execAction executes actions if it is set.
+func (f *Flag) execAction() {
+	if f.Action != nil {
+		f.Action(f)
+	}
 }
 
 // line provides a single line of usage information.
@@ -243,6 +254,7 @@ func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
 	if flag.HasArg == NoArg {
 		// no argument required
 		flag.Value.Update()
+		flag.execAction()
 		return nil
 	}
 	if i < len(f.args) {
@@ -251,11 +263,15 @@ func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
 			err := flag.Value.Set(arg)
 			switch flag.HasArg {
 			case RequiredArg:
+				if err != nil {
+					flag.execAction()
+				}
 				f.removeArg(i)
 				return err
 			case OptionalArg:
 				if err != nil {
 					flag.Value.Update()
+					flag.execAction()
 					return nil
 				}
 				f.removeArg(i)
@@ -269,6 +285,7 @@ func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
 	}
 	// flag.HasArg == OptionalArg
 	flag.Value.Update()
+	flag.execAction()
 	return nil
 }
 
@@ -310,6 +327,9 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 				arg)
 		} else {
 			err = flag.Value.Set(flagArg[1])
+			if err != nil {
+				flag.Action(flag)
+			}
 		}
 		return i, err
 	}
@@ -478,6 +498,29 @@ func (f *FlagSet) Var(value Value, name string, hasArg HasArg) {
 		name = ""
 	}
 	f.VarP(value, name, shorthands, hasArg)
+}
+
+// SetAction sets an action  for a flag. Action will be called after the
+// flag has been updated.
+func (f *FlagSet) SetAction(name string, action Action) {
+	flag, ok := f.formal[name]
+	if !ok {
+		panic(fmt.Errorf("flag %s is unknown", name))
+	}
+	flag.Action = action
+}
+
+// SetPresetAction sets the action for the preset values.
+func (f *FlagSet) SetPresetAction(action Action) {
+	if !f.preset {
+		f.panicf("no preset set")
+	}
+	for _, flag := range f.formal {
+		if _, ok := flag.Value.(*presetValue); !ok {
+			continue
+		}
+		flag.Action = action
+	}
 }
 
 // Var creates a flag for the given option name for the command line.
@@ -915,6 +958,7 @@ func (f *FlagSet) PresetVar(p *int, start, end, value int, usage string) {
 	if f.preset {
 		f.panicf("flagset %s has already a preset", f.name)
 	}
+	f.preset = true
 	f.addLine(presetLine(start, end, usage))
 	*p = value
 	for i := start; i <= end; i++ {
