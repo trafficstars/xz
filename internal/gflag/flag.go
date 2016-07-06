@@ -994,3 +994,15 @@ func (f *FlagSet) Preset(start, end, value int, usage string) *int {
 func Preset(start, end, value int, usage string) *int {
 	return CommandLine.Preset(start, end, value, usage)
 }
+
+// Lookup retrieves the flag with the given name or shorthand. The
+// method returns nil if no flag can be found.
+func (f *FlagSet) Lookup(name string) *Flag {
+	return f.formal[name]
+}
+
+// Lookup retrieves the flag with the given name or shorthand. The
+// method returns nil if no flag can be found.
+func Lookup(name string) *Flag {
+	return CommandLine.Lookup(name)
+}
