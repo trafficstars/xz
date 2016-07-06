@@ -48,6 +48,8 @@ in place).
   -0 ... -9         compression preset; default is 6
   --cpuprofile <file>
                     create a cpuprofile that can be used with go tool pprof
+  --lzma1 <options> options for LZMA1
+  --lzma2 <options> options for LZMA2
 
 With no file, or when FILE is -, read standard input.
 
@@ -102,6 +104,8 @@ type options struct {
 	verbose    int
 	preset     int
 	cpuprofile string
+	lzma1      string
+	lzma2      string
 }
 
 func (o *options) Init() {
@@ -120,6 +124,8 @@ func (o *options) Init() {
 	gflag.CounterVarP(&o.verbose, "verbose", "v", 0, "")
 	gflag.PresetVar(&o.preset, 0, 9, 6, "")
 	gflag.StringVarP(&o.cpuprofile, "cpuprofile", "", "", "")
+	gflag.StringVarP(&o.lzma1, "lzma1", "", "", "")
+	gflag.StringVarP(&o.lzma2, "lzma2", "", "", "")
 }
 
 // normalizeFormat normalizes the format field of options. If the
