@@ -196,6 +196,31 @@ func (s *optionSet) IntExt(name string, value int) *int {
 	return p
 }
 
+type stringValue string
+
+func newStringValue(value string, p *string) *stringValue {
+	*p = value
+	return (*stringValue)(p)
+}
+
+func (s *stringValue) String() string { return string(*s) }
+
+func (s *stringValue) Set(str string) error {
+	*s = stringValue(str)
+	return nil
+}
+
+func (s *optionSet) StringVar(p *string, name string, value string) {
+	v := newStringValue(value, p)
+	s.Var(v, name)
+}
+
+func (s *optionSet) String(name string, value string) *string {
+	p := new(string)
+	s.StringVar(p, name, value)
+	return p
+}
+
 func (s *optionSet) Parse(t string) error {
 	if s.Parsed() {
 		return errors.New("option set already parsed")

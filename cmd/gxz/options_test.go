@@ -59,3 +59,17 @@ func TestOptionSet_Int64Ext(t *testing.T) {
 		t.Fatalf("*a is %d; want %d", *a, 2*cMiB)
 	}
 }
+
+func TestOptionSet_String(t *testing.T) {
+	var os optionSet
+	s := os.String("s", "default")
+	if *s != "default" {
+		t.Fatalf("*s is %q; want %q", *s, "default")
+	}
+	if err := os.Parse("s=foo"); err != nil {
+		t.Fatalf("os.Parse(%q) error %s", "s=foo", err)
+	}
+	if *s != "foo" {
+		t.Fatalf("*s is %q; want %q", *s, "foo")
+	}
+}
