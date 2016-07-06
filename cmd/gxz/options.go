@@ -45,58 +45,6 @@ func (i *int64Value) Set(s string) error {
 
 func (i *int64Value) String() string { return fmt.Sprintf("%v", *i) }
 
-const (
-	eKiB = 1 << ((iota + 1) * 10)
-	eMiB
-	eGiB
-)
-
-type int64ExtValue int64
-
-func newInt64ExtValue(v int64, p *int64) *int64ExtValue {
-	*p = v
-	return (*int64ExtValue)(p)
-}
-
-func (i *int64ExtValue) String() string {
-	n := int64(*i)
-	if n%eGiB == 0 {
-		return fmt.Sprintf("%dGiB", n/eGiB)
-	}
-	if n%eMiB == 0 {
-		return fmt.Sprintf("%dMiB", n/eMiB)
-	}
-	if n%eKiB == 0 {
-		return fmt.Sprintf("%dKiB", n/eKiB)
-	}
-	return fmt.Sprintf("%d", n)
-}
-
-var (
-	kibRegexp = regexp.MustCompile(`(?:KiB|Ki|k|kB|K|KB)$`)
-	mibRegexp = regexp.MustCompile(`(?:MiB|Mi|m|M|MB)$`)
-	gibRegexp = regexp.MustCompile(`(?:GiB|Gi|g|G|GB)$`)
-)
-
-func (i *int64ExtValue) Set(s string) error {
-	t := s
-	a := 1
-	if loc := kibRegexp.FindStringIndex(s); loc != nil {
-		t = s[:loc[0]]
-		a = eKiB
-	} else if loc := mibRegexp.FindStringIndex(s); loc != nil {
-		t = s[:loc[0]]
-		a = eMiB
-	} else if loc := gibRegexp.FindStringIndex(s); loc != nil {
-		t = s[:loc[0]]
-		a = eGiB
-	}
-	n, err := strconv.ParseInt(t, 0, 64)
-	*i = int64ExtValue(n * int64(a))
-	return err
-
-}
-
 func (s *optionSet) Int64Var(p *int64, name string, value int64) {
 	v := newInt64Value(value, p)
 	s.Var(v, name)
@@ -108,6 +56,84 @@ func (s *optionSet) Int64(name string, value int64) *int64 {
 	return p
 }
 
+type intValue int
+
+func newIntValue(v int, p *int) *intValue {
+	*p = v
+	return (*intValue)(p)
+}
+
+func (i *intValue) Set(s string) error {
+	v, err := strconv.ParseInt(s, 0, 64)
+	*i = intValue(v)
+	return err
+}
+
+func (i *intValue) String() string { return fmt.Sprintf("%v", *i) }
+
+func (s *optionSet) IntVar(p *int, name string, value int) {
+	v := newIntValue(value, p)
+	s.Var(v, name)
+}
+
+func (s *optionSet) Int(name string, value int) *int {
+	p := new(int)
+	s.IntVar(p, name, value)
+	return p
+}
+
+const (
+	cKiB = 1 << ((iota + 1) * 10)
+	cMiB
+	cGiB
+)
+
+var (
+	kibRegexp = regexp.MustCompile(`(?:KiB|Ki|k|kB|K|KB)$`)
+	mibRegexp = regexp.MustCompile(`(?:MiB|Mi|m|M|MB)$`)
+	gibRegexp = regexp.MustCompile(`(?:GiB|Gi|g|G|GB)$`)
+)
+
+type int64ExtValue int64
+
+func newInt64ExtValue(v int64, p *int64) *int64ExtValue {
+	*p = v
+	return (*int64ExtValue)(p)
+}
+
+func (i *int64ExtValue) String() string {
+	n := int64(*i)
+	if n%cGiB == 0 {
+		return fmt.Sprintf("%dGiB", n/cGiB)
+	}
+	if n%cMiB == 0 {
+		return fmt.Sprintf("%dMiB", n/cMiB)
+	}
+	if n%cKiB == 0 {
+		return fmt.Sprintf("%dKiB", n/cKiB)
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+func (i *int64ExtValue) Set(s string) error {
+	t := s
+	a := 1
+	if loc := kibRegexp.FindStringIndex(s); loc != nil {
+		t = s[:loc[0]]
+		a = cKiB
+	} else if loc := mibRegexp.FindStringIndex(s); loc != nil {
+		t = s[:loc[0]]
+		a = cMiB
+	} else if loc := gibRegexp.FindStringIndex(s); loc != nil {
+		t = s[:loc[0]]
+		a = cGiB
+	}
+	n, err := strconv.ParseInt(t, 0, 64)
+	*i = int64ExtValue(n * int64(a))
+	return err
+
+}
+
 func (s *optionSet) Int64ExtVar(p *int64, name string, value int64) {
 	v := newInt64ExtValue(value, p)
 	s.Var(v, name)
@@ -116,6 +142,57 @@ func (s *optionSet) Int64ExtVar(p *int64, name string, value int64) {
 func (s *optionSet) Int64Ext(name string, value int64) *int64 {
 	p := new(int64)
 	s.Int64ExtVar(p, name, value)
+	return p
+}
+
+type intExtValue int
+
+func newIntExtValue(v int, p *int) *intExtValue {
+	*p = v
+	return (*intExtValue)(p)
+}
+
+func (i *intExtValue) String() string {
+	n := int(*i)
+	if n%cGiB == 0 {
+		return fmt.Sprintf("%dGiB", n/cGiB)
+	}
+	if n%cMiB == 0 {
+		return fmt.Sprintf("%dMiB", n/cMiB)
+	}
+	if n%cKiB == 0 {
+		return fmt.Sprintf("%dKiB", n/cKiB)
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+func (i *intExtValue) Set(s string) error {
+	t := s
+	a := 1
+	if loc := kibRegexp.FindStringIndex(s); loc != nil {
+		t = s[:loc[0]]
+		a = cKiB
+	} else if loc := mibRegexp.FindStringIndex(s); loc != nil {
+		t = s[:loc[0]]
+		a = cMiB
+	} else if loc := gibRegexp.FindStringIndex(s); loc != nil {
+		t = s[:loc[0]]
+		a = cGiB
+	}
+	n, err := strconv.ParseInt(t, 0, 64)
+	*i = intExtValue(n * int64(a))
+	return err
+
+}
+
+func (s *optionSet) IntExtVar(p *int, name string, value int) {
+	v := newIntExtValue(value, p)
+	s.Var(v, name)
+}
+
+func (s *optionSet) IntExt(name string, value int) *int {
+	p := new(int)
+	s.IntExtVar(p, name, value)
 	return p
 }
 

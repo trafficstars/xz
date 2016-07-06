@@ -48,14 +48,14 @@ func TestOptionSet_Parse(t *testing.T) {
 
 func TestOptionSet_Int64Ext(t *testing.T) {
 	var os optionSet
-	a := os.Int64Ext("a", 4*eKiB)
-	if *a != 4*eKiB {
-		t.Fatalf("*a is %d; want %d", *a, 4*eKiB)
+	a := os.Int64Ext("a", 4*cKiB)
+	if *a != 4*cKiB {
+		t.Fatalf("*a is %d; want %d", *a, 4*cKiB)
 	}
 	if err := os.Parse("a=2MiB"); err != nil {
 		t.Fatalf("os.Parse(%q) error %s", "a=2MiB", err)
 	}
-	if *a != 2*eMiB {
-		t.Fatalf("*a is %d; want %d", *a, 2*eMiB)
+	if *a != 2*cMiB {
+		t.Fatalf("*a is %d; want %d", *a, 2*cMiB)
 	}
 }
