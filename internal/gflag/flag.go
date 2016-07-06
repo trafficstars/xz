@@ -143,7 +143,6 @@ type FlagSet struct {
 
 	name          string
 	parsed        bool
-	actual        map[string]*Flag
 	formal        map[string]*Flag
 	lines         lines
 	args          []string
