@@ -74,7 +74,8 @@ func NewReader(xz io.Reader) (r *Reader, err error) {
 
 // NewReader creates an xz stream reader. The created reader will be
 // able to process multiple streams and padding unless a SingleStream
-// has been set in the reader configuration c.
+// has been set in the reader configuration c. ReaderConfig fields with
+// zero values will be set to default values.
 func (c ReaderConfig) NewReader(xz io.Reader) (r *Reader, err error) {
 	if err = c.Verify(); err != nil {
 		return nil, err

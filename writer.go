@@ -170,7 +170,9 @@ func NewWriter(xz io.Writer) (w *Writer, err error) {
 	return WriterConfig{}.NewWriter(xz)
 }
 
-// NewWriter creates a new Writer using the given configuration parameters.
+// NewWriter creates a new Writer using the given configuration
+// parameters. WriterConfig fields with zero values will be replaced by
+// default parameters.
 func (c WriterConfig) NewWriter(xz io.Writer) (w *Writer, err error) {
 	if err = c.Verify(); err != nil {
 		return nil, err
