@@ -328,7 +328,7 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 		} else {
 			err = flag.Value.Set(flagArg[1])
 			if err != nil {
-				flag.Action(flag)
+				flag.execAction()
 			}
 		}
 		return i, err
