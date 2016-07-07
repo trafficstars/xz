@@ -159,32 +159,3 @@ func TestFlagSet_Preset(t *testing.T) {
 		t.Errorf("preset is %d; want %d", *n, 8)
 	}
 }
-
-func TestFlagSet_Action(t *testing.T) {
-	f := NewFlagSet("Action", ContinueOnError)
-	f.Bool("test-a", false, "")
-	f.BoolP("test-b", "b", true, "")
-	var aAct bool
-	f.SetAction("test-a", func(f *Flag) { aAct = true })
-	err := f.Parse([]string{"--test-a"})
-	if err != nil {
-		t.Fatalf("f.Parse error %s", err)
-	}
-	if !aAct {
-		t.Fatalf("Action for --test-a not called")
-	}
-}
-
-func TestFlagSet_PresetAction(t *testing.T) {
-	f := NewFlagSet("PresetAction", ContinueOnError)
-	f.Preset(0, 9, 6, "")
-	var presetAct bool
-	f.SetPresetAction(func(f *Flag) { presetAct = true })
-	err := f.Parse([]string{"-9"})
-	if err != nil {
-		t.Fatalf("f.Parse error %s", err)
-	}
-	if !presetAct {
-		t.Fatalf("Action for -9 not called")
-	}
-}

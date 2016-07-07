@@ -48,31 +48,21 @@ const (
 	OptionalArg
 )
 
-// Value is the interface to the value of a specific flag.
+// Value is the interface to the value of a specific flag. Set with an
+// empty string indicates that the flag is present without an argument.
 type Value interface {
 	Set(string) error
-	Update()
 	Get() interface{}
 	String() string
 }
 
-// Action to be called after flag updates.
-type Action func(f *Flag)
-
 // Flag represents a single flag.
 type Flag struct {
-	Name       string
-	Shorthands string
-	HasArg     HasArg
-	Value      Value
-	Action     Action
-}
-
-// execAction executes actions if it is set.
-func (f *Flag) execAction() {
-	if f.Action != nil {
-		f.Action(f)
-	}
+	Name         string
+	Shorthands   string
+	HasArg       HasArg
+	Value        Value
+	DefaultValue string
 }
 
 // line provides a single line of usage information.
@@ -241,9 +231,7 @@ func (f *FlagSet) lookupShortOption(r rune) (flag *Flag, err error) {
 func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
 	if flag.HasArg == NoArg {
 		// no argument required
-		flag.Value.Update()
-		flag.execAction()
-		return nil
+		return flag.Value.Set("")
 	}
 	if i < len(f.args) {
 		arg := f.args[i]
@@ -251,16 +239,11 @@ func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
 			err := flag.Value.Set(arg)
 			switch flag.HasArg {
 			case RequiredArg:
-				if err != nil {
-					flag.execAction()
-				}
 				f.removeArg(i)
 				return err
 			case OptionalArg:
 				if err != nil {
-					flag.Value.Update()
-					flag.execAction()
-					return nil
+					return flag.Value.Set("")
 				}
 				f.removeArg(i)
 				return nil
@@ -272,9 +255,7 @@ func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
 		return fmt.Errorf("no argument present")
 	}
 	// flag.HasArg == OptionalArg
-	flag.Value.Update()
-	flag.execAction()
-	return nil
+	return flag.Value.Set("")
 }
 
 // removeArg removes the arguments at position i from the args field of
@@ -315,9 +296,6 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 				arg)
 		} else {
 			err = flag.Value.Set(flagArg[1])
-			if err != nil {
-				flag.execAction()
-			}
 		}
 		return i, err
 	}
@@ -449,10 +427,11 @@ func (f *FlagSet) setFormal(name string, flag *Flag) {
 // VarP creates a flag with a long and shorthand options.
 func (f *FlagSet) VarP(value Value, name, shorthands string, hasArg HasArg) {
 	flag := &Flag{
-		Name:       name,
-		Shorthands: shorthands,
-		Value:      value,
-		HasArg:     hasArg,
+		Name:         name,
+		Shorthands:   shorthands,
+		Value:        value,
+		HasArg:       hasArg,
+		DefaultValue: value.String(),
 	}
 
 	if flag.Name == "" && flag.Shorthands == "" {
@@ -488,41 +467,6 @@ func (f *FlagSet) Var(value Value, name string, hasArg HasArg) {
 	f.VarP(value, name, shorthands, hasArg)
 }
 
-// SetAction sets an action  for a flag. Action will be called after the
-// flag has been updated.
-func (f *FlagSet) SetAction(name string, action Action) {
-	flag, ok := f.formal[name]
-	if !ok {
-		panic(fmt.Errorf("flag %s is unknown", name))
-	}
-	flag.Action = action
-}
-
-// SetAction sets an action for a commandline flag. The Action will be
-// called after the flag has been updated.
-func SetAction(name string, action Action) {
-	CommandLine.SetAction(name, action)
-}
-
-// SetPresetAction sets the action for the preset values.
-func (f *FlagSet) SetPresetAction(action Action) {
-	if !f.preset {
-		f.panicf("no preset set")
-	}
-	for _, flag := range f.formal {
-		if _, ok := flag.Value.(*presetValue); !ok {
-			continue
-		}
-		flag.Action = action
-	}
-}
-
-// SetPresetAction sets the action for the preset flags of the
-// CommandLine. The preset must have been set.
-func SetPresetAction(action Action) {
-	CommandLine.SetPresetAction(action)
-}
-
 // Var creates a flag for the given option name for the command line.
 func Var(value Value, name string, hasArg HasArg) {
 	CommandLine.Var(value, name, hasArg)
@@ -552,14 +496,13 @@ func (b *boolValue) Get() interface{} {
 
 // Set sets the bool value to the value provided by the string.
 func (b *boolValue) Set(s string) error {
+	if s == "" {
+		*b = true
+		return nil
+	}
 	v, err := strconv.ParseBool(s)
 	*b = boolValue(v)
 	return err
-}
-
-// Update sets the bool value to true.
-func (b *boolValue) Update() {
-	*b = true
 }
 
 // String returns the boll value as string.
@@ -654,17 +597,16 @@ func (n *intValue) Get() interface{} {
 
 // Set sets the integer value.
 func (n *intValue) Set(s string) error {
+	if s == "" {
+		(*n)++
+		return nil
+	}
 	v, err := strconv.ParseInt(s, 0, 0)
 	if err != nil {
 		return err
 	}
 	*n = intValue(v)
 	return nil
-}
-
-// Update increments the integer value.
-func (n *intValue) Update() {
-	(*n)++
 }
 
 // String represents the integer value as string.
@@ -929,14 +871,13 @@ func (p *presetValue) Get() interface{} {
 
 // Set sets the preset value from an integer string.
 func (p *presetValue) Set(s string) error {
+	if s == "" {
+		*p.p = p.preset
+		return nil
+	}
 	val, err := strconv.ParseInt(s, 0, 0)
 	*p.p = int(val)
 	return err
-}
-
-// Update sets the preset value to the default.
-func (p *presetValue) Update() {
-	*p.p = p.preset
 }
 
 // String returns the integer representation of the preset value.
