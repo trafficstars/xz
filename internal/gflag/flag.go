@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -51,7 +50,7 @@ const (
 // Value is the interface to the value of a specific flag. Set with an
 // empty string indicates that the flag is present without an argument.
 type Value interface {
-	Set(string) error
+	Set(flag, arg string) error
 	Get() interface{}
 	String() string
 }
@@ -63,67 +62,34 @@ type Flag struct {
 	HasArg       HasArg
 	Value        Value
 	DefaultValue string
+	UsageFlags   string
+	Usage        string
 }
 
-// line provides a single line of usage information.
-type line struct {
-	flags string
-	usage string
-}
-
-// lineFlags computes the flags string for a usage line.
-func lineFlags(name, shorthands, defaultValue string) string {
-	buf := new(bytes.Buffer)
-	if shorthands != "" {
-		for i, r := range shorthands {
+func (f *Flag) usageFlags() string {
+	if f.UsageFlags != "" {
+		return f.UsageFlags
+	}
+	var buf bytes.Buffer
+	if f.Shorthands != "" {
+		for i, r := range f.Shorthands {
 			if i > 0 {
-				fmt.Fprint(buf, ", ")
+				fmt.Fprint(&buf, ", ")
 			}
-			fmt.Fprintf(buf, "-%c", r)
+			fmt.Fprintf(&buf, "-%c", r)
 		}
 	}
-	if name != "" {
+	if f.Name != "" {
 		if buf.Len() > 0 {
-			fmt.Fprintf(buf, ", ")
+			fmt.Fprintf(&buf, ", ")
 		}
-		fmt.Fprint(buf, "--", name)
-		if defaultValue != "" {
-			fmt.Fprintf(buf, "=%s", defaultValue)
+		fmt.Fprint(&buf, "--", f.Name)
+		if f.DefaultValue != "" {
+			fmt.Fprintf(&buf, "=%s", f.DefaultValue)
 		}
 	}
 	return buf.String()
 }
-
-// lines provides a set of usage lines.
-type lines []line
-
-// writeLines writes usage line to the writer.
-func writeLines(w io.Writer, ls lines) (n int, err error) {
-	l := make(lines, len(ls))
-	copy(l, ls)
-	sort.Sort(l)
-	maxLenFlags := 0
-	for _, line := range l {
-		k := len(line.flags)
-		if k > maxLenFlags {
-			maxLenFlags = k
-		}
-	}
-	for _, line := range l {
-		format := fmt.Sprintf("  %%-%ds  %%s\n", maxLenFlags)
-		var k int
-		k, err = fmt.Fprintf(w, format, line.flags, line.usage)
-		n += k
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-func (l lines) Len() int           { return len(l) }
-func (l lines) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
-func (l lines) Less(i, j int) bool { return l[i].flags < l[j].flags }
 
 // FlagSet represents a set of option flags.
 type FlagSet struct {
@@ -133,7 +99,6 @@ type FlagSet struct {
 	name          string
 	parsed        bool
 	formal        map[string]*Flag
-	lines         lines
 	args          []string
 	output        io.Writer
 	errorHandling ErrorHandling
@@ -228,22 +193,22 @@ func (f *FlagSet) lookupShortOption(r rune) (flag *Flag, err error) {
 
 // processExtraFlagArg processes a flag with extra arguments not using
 // the form --long-option=arg.
-func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
+func (f *FlagSet) processExtraFlagArg(name string, flag *Flag, i int) error {
 	if flag.HasArg == NoArg {
 		// no argument required
-		return flag.Value.Set("")
+		return flag.Value.Set(name, "")
 	}
 	if i < len(f.args) {
 		arg := f.args[i]
 		if len(arg) == 0 || arg[0] != '-' {
-			err := flag.Value.Set(arg)
+			err := flag.Value.Set(name, arg)
 			switch flag.HasArg {
 			case RequiredArg:
 				f.removeArg(i)
 				return err
 			case OptionalArg:
 				if err != nil {
-					return flag.Value.Set("")
+					return flag.Value.Set(name, "")
 				}
 				f.removeArg(i)
 				return nil
@@ -252,10 +217,10 @@ func (f *FlagSet) processExtraFlagArg(flag *Flag, i int) error {
 	}
 	// no argument
 	if flag.HasArg == RequiredArg {
-		return fmt.Errorf("no argument present")
+		return fmt.Errorf("flag %s lacks argument", name)
 	}
 	// flag.HasArg == OptionalArg
-	return flag.Value.Set("")
+	return flag.Value.Set(name, "")
 }
 
 // removeArg removes the arguments at position i from the args field of
@@ -287,7 +252,7 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 		}
 		// case 1: no equal sign
 		if len(flagArg) == 1 {
-			err = f.processExtraFlagArg(flag, i)
+			err = f.processExtraFlagArg(flagArg[0], flag, i)
 			return i, err
 		}
 		// case 2: equal sign
@@ -295,7 +260,7 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 			err = fmt.Errorf("option %s doesn't support argument",
 				arg)
 		} else {
-			err = flag.Value.Set(flagArg[1])
+			err = flag.Value.Set(flagArg[0], flagArg[1])
 		}
 		return i, err
 	}
@@ -307,7 +272,8 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 		if err != nil {
 			return i, err
 		}
-		if err = f.processExtraFlagArg(flag, i); err != nil {
+		err = f.processExtraFlagArg(string([]rune{r}), flag, i)
+		if err != nil {
 			return i, err
 		}
 	}
@@ -370,10 +336,7 @@ func (f *FlagSet) Parse(arguments []string) error {
 
 // PrintDefaults prints information about all flags.
 func (f *FlagSet) PrintDefaults() {
-	_, err := writeLines(f.out(), f.lines)
-	if err != nil {
-		f.panicf("writeLines error %s", err)
-	}
+	panic("TODO")
 }
 
 // PrintDefaults prints the information about all command line flags.
@@ -425,13 +388,18 @@ func (f *FlagSet) setFormal(name string, flag *Flag) {
 }
 
 // VarP creates a flag with a long and shorthand options.
-func (f *FlagSet) VarP(value Value, name, shorthands string, hasArg HasArg) {
+func (f *FlagSet) VarP(value Value, name, shorthands string, hasArg HasArg, usage string) {
+	if len(name) == 1 {
+		shorthands += name
+		name = ""
+	}
 	flag := &Flag{
 		Name:         name,
 		Shorthands:   shorthands,
 		Value:        value,
 		HasArg:       hasArg,
 		DefaultValue: value.String(),
+		Usage:        usage,
 	}
 
 	if flag.Name == "" && flag.Shorthands == "" {
@@ -453,31 +421,18 @@ func (f *FlagSet) VarP(value Value, name, shorthands string, hasArg HasArg) {
 }
 
 // VarP creates a flag for the given value for the command line.
-func VarP(value Value, name, shorthands string, hasArg HasArg) {
-	CommandLine.VarP(value, name, shorthands, hasArg)
+func VarP(value Value, name, shorthands string, hasArg HasArg, usage string) {
+	CommandLine.VarP(value, name, shorthands, hasArg, usage)
 }
 
 // Var creates a flag for the given option name.
-func (f *FlagSet) Var(value Value, name string, hasArg HasArg) {
-	shorthands := ""
-	if len(name) == 1 {
-		shorthands = name
-		name = ""
-	}
-	f.VarP(value, name, shorthands, hasArg)
+func (f *FlagSet) Var(value Value, name string, usage string) {
+	f.VarP(value, name, "", RequiredArg, usage)
 }
 
 // Var creates a flag for the given option name for the command line.
-func Var(value Value, name string, hasArg HasArg) {
-	CommandLine.Var(value, name, hasArg)
-}
-
-// addLine adds a usage line to the flag set.
-func (f *FlagSet) addLine(l line) {
-	if l.flags == "" {
-		f.panicf("no flags for %q", l.usage)
-	}
-	f.lines = append(f.lines, l)
+func Var(value Value, name string, usage string) {
+	CommandLine.Var(value, name, usage)
 }
 
 // boolValue represents a bool value in the flag.
@@ -495,13 +450,15 @@ func (b *boolValue) Get() interface{} {
 }
 
 // Set sets the bool value to the value provided by the string.
-func (b *boolValue) Set(s string) error {
-	if s == "" {
+func (b *boolValue) Set(flag, arg string) error {
+	if arg == "" {
 		*b = true
 		return nil
 	}
-	v, err := strconv.ParseBool(s)
-	*b = boolValue(v)
+	v, err := strconv.ParseBool(arg)
+	if err == nil {
+		*b = boolValue(v)
+	}
 	return err
 }
 
@@ -510,21 +467,11 @@ func (b *boolValue) String() string {
 	return fmt.Sprintf("%t", *b)
 }
 
-// boolLine creates the usage line for a bool flag.
-func boolLine(name, shorthands string, value bool, usage string) line {
-	defaultValue := ""
-	if value {
-		defaultValue = "true"
-	}
-	return line{lineFlags(name, shorthands, defaultValue), usage}
-}
-
 // BoolVarP defines a bool flag with specified name, shorthands, default
 // value and usage string. The argument p points to a bool variable in
 // which to store the value of the flag.
 func (f *FlagSet) BoolVarP(p *bool, name, shorthands string, value bool, usage string) {
-	f.addLine(boolLine(name, shorthands, value, usage))
-	f.VarP(newBoolValue(value, p), name, shorthands, OptionalArg)
+	f.VarP(newBoolValue(value, p), name, shorthands, OptionalArg, usage)
 }
 
 // BoolP defines a bool flag with specified name, shorthands, default
@@ -554,8 +501,7 @@ func BoolVarP(p *bool, name, shorthands string, value bool, usage string) {
 // usage string. The argument p points to a bool variable in which to
 // store the value of the flag.
 func (f *FlagSet) BoolVar(p *bool, name string, value bool, usage string) {
-	f.addLine(boolLine(name, "", value, usage))
-	f.Var(newBoolValue(value, p), name, OptionalArg)
+	f.VarP(newBoolValue(value, p), name, "", OptionalArg, usage)
 }
 
 // BoolVar defines a bool flag with specified name, default value and
@@ -596,17 +542,16 @@ func (n *intValue) Get() interface{} {
 }
 
 // Set sets the integer value.
-func (n *intValue) Set(s string) error {
-	if s == "" {
+func (n *intValue) Set(flag, arg string) error {
+	if arg == "" {
 		(*n)++
 		return nil
 	}
-	v, err := strconv.ParseInt(s, 0, 0)
-	if err != nil {
-		return err
+	v, err := strconv.ParseInt(arg, 0, 0)
+	if err == nil {
+		*n = intValue(v)
 	}
-	*n = intValue(v)
-	return nil
+	return err
 }
 
 // String represents the integer value as string.
@@ -614,17 +559,11 @@ func (n *intValue) String() string {
 	return fmt.Sprintf("%d", *n)
 }
 
-// counterLine returns the usage line for a counter flag.
-func counterLine(name, shorthands, usage string) line {
-	return line{lineFlags(name, shorthands, ""), usage}
-}
-
 // CounterVarP defines a counter flag with specified name, shorthands, default
 // value and usage string. The argument p points to an integer variable in
 // which to store the value of the flag.
 func (f *FlagSet) CounterVarP(p *int, name, shorthands string, value int, usage string) {
-	f.addLine(counterLine(name, shorthands, usage))
-	f.VarP(newIntValue(value, p), name, shorthands, OptionalArg)
+	f.VarP(newIntValue(value, p), name, shorthands, OptionalArg, usage)
 }
 
 // CounterVarP defines a counter flag with specified name, shorthands, default
@@ -654,8 +593,7 @@ func CounterP(name, shorthands string, value int, usage string) *int {
 // usage string. The argument p points to an integer variable in which to
 // store the value of the flag.
 func (f *FlagSet) CounterVar(p *int, name string, value int, usage string) {
-	f.addLine(counterLine(name, "", usage))
-	f.Var(newIntValue(value, p), name, OptionalArg)
+	f.VarP(newIntValue(value, p), name, "", OptionalArg, usage)
 }
 
 // CounterVar defines a counter flag with specified name, default value and
@@ -681,21 +619,11 @@ func Counter(name string, value int, usage string) *int {
 	return CommandLine.Counter(name, value, usage)
 }
 
-// intLine returns the usage line for an integer flag.
-func intLine(name, shorthands string, value int, usage string) line {
-	defaultValue := ""
-	if value != 0 {
-		defaultValue = fmt.Sprintf("%d", value)
-	}
-	return line{lineFlags(name, shorthands, defaultValue), usage}
-}
-
 // IntVarP defines an integer flag with specified name, shorthands, default
 // value and usage string. The argument p points to an integer variable in
 // which to store the value of the flag.
 func (f *FlagSet) IntVarP(p *int, name, shorthands string, value int, usage string) {
-	f.addLine(intLine(name, shorthands, value, usage))
-	f.VarP(newIntValue(value, p), name, shorthands, RequiredArg)
+	f.VarP(newIntValue(value, p), name, shorthands, RequiredArg, usage)
 }
 
 // IntVarP defines an integer flag with specified name, shorthands, default
@@ -725,8 +653,7 @@ func IntP(name, shorthands string, value int, usage string) *int {
 // usage string. The argument p points to an integer variable in which to
 // store the value of the flag.
 func (f *FlagSet) IntVar(p *int, name string, value int, usage string) {
-	f.addLine(intLine(name, "", value, usage))
-	f.Var(newIntValue(value, p), name, RequiredArg)
+	f.VarP(newIntValue(value, p), name, "", RequiredArg, usage)
 }
 
 // IntVar defines an integer flag with specified name, default value and
@@ -770,14 +697,16 @@ func (s *stringValue) Get() interface{} {
 }
 
 // Set sets the string value.
-func (s *stringValue) Set(str string) error {
-	*s.p = str
+func (s *stringValue) Set(flag, arg string) error {
+	if arg == "" {
+		arg = s.value
+	}
+	*s.p = arg
 	return nil
 }
 
 // Update resets the string value to its default.
 func (s *stringValue) Update() {
-	*s.p = s.value
 }
 
 // String returns simply the string stored in the value.
@@ -785,17 +714,11 @@ func (s *stringValue) String() string {
 	return *s.p
 }
 
-// stringLine creates a usage line.
-func stringLine(name, shorthands, value, usage string) line {
-	return line{lineFlags(name, shorthands, value), usage}
-}
-
 // StringVarP defines an string flag with specified name, shorthands, default
 // value and usage string. The argument p points to a string variable in
 // which to store the value of the flag.
 func (f *FlagSet) StringVarP(p *string, name, shorthands, value, usage string) {
-	f.addLine(stringLine(name, shorthands, value, usage))
-	f.VarP(newStringValue(value, p), name, shorthands, RequiredArg)
+	f.VarP(newStringValue(value, p), name, shorthands, RequiredArg, usage)
 }
 
 // StringVarP defines an string flag with specified name, shorthands, default
@@ -825,8 +748,7 @@ func StringP(name, shorthands, value, usage string) *string {
 // usage string. The argument p points to a string variable in which to
 // store the value of the flag.
 func (f *FlagSet) StringVar(p *string, name, value, usage string) {
-	f.addLine(stringLine(name, "", value, usage))
-	f.Var(newStringValue(value, p), name, RequiredArg)
+	f.VarP(newStringValue(value, p), name, "", RequiredArg, usage)
 }
 
 // StringVar defines a string flag with specified name, default value and
@@ -854,40 +776,29 @@ func String(name, value, usage string) *string {
 
 // presetValue represents an integer value that can be set with multiple
 // flags as -1 ... -9.
-type presetValue struct {
-	p      *int
-	preset int
-}
+type presetValue int
 
 // newPresetValue allocates a new preset value and returns its pointer.
 func newPresetValue(p *int, preset int) *presetValue {
-	return &presetValue{p, preset}
+	*p = preset
+	return (*presetValue)(p)
 }
 
 // Get returns the actual preset value as integer.
 func (p *presetValue) Get() interface{} {
-	return *p.p
+	return (int)(*p)
 }
 
 // Set sets the preset value from an integer string.
-func (p *presetValue) Set(s string) error {
-	if s == "" {
-		*p.p = p.preset
-		return nil
-	}
-	val, err := strconv.ParseInt(s, 0, 0)
-	*p.p = int(val)
+func (p *presetValue) Set(flag, arg string) error {
+	val, err := strconv.ParseInt(flag, 0, 0)
+	*p = presetValue(val)
 	return err
 }
 
 // String returns the integer representation of the preset value.
 func (p *presetValue) String() string {
-	return fmt.Sprintf("%d", *p.p)
-}
-
-// presetLine creates the usage line for a preset value.
-func presetLine(start, end int, usage string) line {
-	return line{fmt.Sprintf("-%d ... -%d", start, end), usage}
+	return fmt.Sprintf("%d", int(*p))
 }
 
 // PresetVar defines a range of preset flags starting at start and
@@ -899,12 +810,21 @@ func (f *FlagSet) PresetVar(p *int, start, end, value int, usage string) {
 	if f.preset {
 		f.panicf("flagset %s has already a preset", f.name)
 	}
-	f.preset = true
-	f.addLine(presetLine(start, end, usage))
-	*p = value
-	for i := start; i <= end; i++ {
-		f.Var(newPresetValue(p, i), fmt.Sprintf("%d", i), NoArg)
+	if !(0 <= start && start <= 9) {
+		f.panicf("start must be in range 0 to 9")
 	}
+	if !(0 <= end && end <= 9) {
+		f.panicf("end must be in range 0 to 9")
+	}
+	if start >= end {
+		f.panicf("start must be less than end")
+	}
+	f.preset = true
+	var buf bytes.Buffer
+	for i := start; i <= end; i++ {
+		fmt.Fprintf(&buf, "%d", i)
+	}
+	f.VarP(newPresetValue(p, value), "", buf.String(), NoArg, usage)
 }
 
 // PresetVar defines a range of preset flags starting at start and
