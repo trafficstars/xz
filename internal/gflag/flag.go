@@ -510,6 +510,12 @@ func (f *FlagSet) SetAction(name string, action Action) {
 	flag.Action = action
 }
 
+// SetAction sets an action for a commandline flag. The Action will be
+// called after the flag has been updated.
+func SetAction(name string, action Action) {
+	CommandLine.SetAction(name, action)
+}
+
 // SetPresetAction sets the action for the preset values.
 func (f *FlagSet) SetPresetAction(action Action) {
 	if !f.preset {
@@ -521,6 +527,12 @@ func (f *FlagSet) SetPresetAction(action Action) {
 		}
 		flag.Action = action
 	}
+}
+
+// SetPresetAction sets the action for the preset flags of the
+// CommandLine. The preset must have been set.
+func SetPresetAction(action Action) {
+	CommandLine.SetPresetAction(action)
 }
 
 // Var creates a flag for the given option name for the command line.
