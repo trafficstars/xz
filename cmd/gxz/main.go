@@ -104,8 +104,8 @@ type options struct {
 	verbose    int
 	preset     int
 	cpuprofile string
-	lzma1      string
-	lzma2      string
+	lzma1      lzmaOptions
+	lzma2      lzmaOptions
 }
 
 func (o *options) Init() {
@@ -123,9 +123,15 @@ func (o *options) Init() {
 	gflag.CounterVarP(&o.quiet, "quiet", "q", 0, "")
 	gflag.CounterVarP(&o.verbose, "verbose", "v", 0, "")
 	gflag.PresetVar(&o.preset, 0, 9, 6, "")
+	gflag.SetPresetAction(func(*gflag.Flag) {
+		o.lzma1.applyPreset(o.preset)
+		o.lzma2.applyPreset(o.preset)
+	})
 	gflag.StringVarP(&o.cpuprofile, "cpuprofile", "", "", "")
-	gflag.StringVarP(&o.lzma1, "lzma1", "", "", "")
-	gflag.StringVarP(&o.lzma2, "lzma2", "", "", "")
+	o.lzma1.applyPreset(6)
+	gflag.Var(&o.lzma1, "lzma1", gflag.RequiredArg)
+	o.lzma2.applyPreset(6)
+	gflag.Var(&o.lzma2, "lzma2", gflag.RequiredArg)
 }
 
 // normalizeFormat normalizes the format field of options. If the
