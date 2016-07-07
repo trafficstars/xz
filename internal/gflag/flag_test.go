@@ -6,8 +6,22 @@ package gflag
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"testing"
 )
+
+func Example() {
+	f := BoolP("force", "f", false, "force flag")
+
+	os.Args = []string{os.Args[0], "-f"}
+	Parse()
+
+	if *f {
+		fmt.Println("force flag set")
+	}
+	// Output: force flag set
+}
 
 func TestFlagSet_Bool(t *testing.T) {
 	f := NewFlagSet("Bool", ContinueOnError)
