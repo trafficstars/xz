@@ -3,13 +3,21 @@
 ## Release v0.6
 
 1. Change matcher interface suppporting Depth and NiceLength
+
     - return multiple matches one longer than the other
+
     - adapt current matchers accordingly
+
     - implement hash chain with multiple word length
-        2 - only 2
-        3 - 2 and 3
-        4 - 2, 3 and 4
+
+         word length  comment
+        ------------- ----------
+                   2  only 2
+                   3  2 and 3
+                   4  2, 3 and 4
+
     - analyze binary tree implementation in xz
+
 3. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
 4. Do some optimizations
