@@ -2,13 +2,7 @@
 
 ## Release v0.6
 
-1. Implement lzmaOptions type for gxz that can parse the LZMA options.
-    - rename MatchAlgorithm MatchFinder and name field MatchFinder
-    - parse options
-    - print options
-    - generate various configs from the option
-    - support it in gxz
-2. change matcher interface suppporting Depth and NiceLength
+1. Change matcher interface suppporting Depth and NiceLength
     - return multiple matches one longer than the other
     - adapt current matchers accordingly
     - implement hash chain with multiple word length
