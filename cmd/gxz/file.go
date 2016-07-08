@@ -57,29 +57,31 @@ var lzmaDictCapExps = []uint{18, 20, 21, 22, 22, 23, 23, 24, 25, 26}
 // newLZMAWriterConfig converts options into an lzma.WriterConfig.
 func newLZMAWriterConfig(opts *options) *lzma.WriterConfig {
 	return &lzma.WriterConfig{
-		Properties: &lzma.Properties{LC: 3, LP: 0, PB: 2},
-		DictCap:    1 << lzmaDictCapExps[opts.preset],
+		Properties: opts.lzma1.Properties(),
+		DictCap:    opts.lzma1.DictCap(),
 	}
+
 }
 
 // newLZMAReaderConfig converts options into an lzma.ReaderConfig.
 func newLZMAReaderConfig(opts *options) *lzma.ReaderConfig {
 	return &lzma.ReaderConfig{
-		DictCap: 1 << lzmaDictCapExps[opts.preset],
+		DictCap: opts.lzma1.DictCap(),
 	}
 }
 
 // newXZWriterConfig converts options into an xz.WriterConfig.
 func newXZWriterConfig(opts *options) *xz.WriterConfig {
 	return &xz.WriterConfig{
-		DictCap: 1 << lzmaDictCapExps[opts.preset],
+		Properties: opts.lzma2.Properties(),
+		DictCap:    opts.lzma2.DictCap(),
 	}
 }
 
 // newXZReaderConfig converts options into an xz.ReaderConfig.
 func newXZReaderConfig(opts *options) *xz.ReaderConfig {
 	return &xz.ReaderConfig{
-		DictCap: 1 << lzmaDictCapExps[opts.preset],
+		DictCap: opts.lzma2.DictCap(),
 	}
 }
 

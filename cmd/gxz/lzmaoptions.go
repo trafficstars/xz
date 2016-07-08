@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/ulikunitz/xz/lzma"
 )
 
 // value provides an interface to a value store.
@@ -453,4 +455,28 @@ func (o *lzmaOptions) String() string {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+// Properties returns a lzma.Properties instance initialized with the
+// parameters lc, lp and pb of the lzma options.
+func (o *lzmaOptions) Properties() *lzma.Properties {
+	return &lzma.Properties{LC: o.lc, LP: o.lp, PB: o.pb}
+}
+
+// DictCap returns the dictionary capacity. An error is returned if the
+// dictCap is out of range. Note that on 32-bit platforms the maximum
+// supported dictionary capacity is 2^31-1, the maximum integer value.
+func (o *lzmaOptions) DictCap() int {
+	const maxInt = 1<<31 - 1
+	dc := o.dictCap
+	if dc < lzma.MinDictCap {
+		dc = lzma.MinDictCap
+	}
+	if dc > maxInt {
+		dc = maxInt
+	}
+	if dc > lzma.MaxDictCap {
+		dc = lzma.MaxDictCap
+	}
+	return int(dc)
 }
