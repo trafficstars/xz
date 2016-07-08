@@ -94,7 +94,7 @@ func TestLZMAOptions_Set(t *testing.T) {
 		t.Fatalf("o.String() returned %q; want %q", s, "")
 	}
 	arg := "preset=7,dict=1KiB,mf=bt3"
-	if err := o.Set(arg); err != nil {
+	if err := o.Set("lzma1", arg); err != nil {
 		t.Fatalf("o.Set(%q) error %s", arg, err)
 	}
 	s = o.String()

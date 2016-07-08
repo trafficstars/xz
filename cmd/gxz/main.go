@@ -123,15 +123,16 @@ func (o *options) Init() {
 	gflag.CounterVarP(&o.quiet, "quiet", "q", 0, "")
 	gflag.CounterVarP(&o.verbose, "verbose", "v", 0, "")
 	gflag.PresetVar(&o.preset, 0, 9, 6, "")
-	gflag.SetPresetAction(func(*gflag.Flag) {
+	flag := gflag.Lookup("1")
+	flag.Action = func(flag *gflag.Flag, name, arg string) {
 		o.lzma1.applyPreset(o.preset)
 		o.lzma2.applyPreset(o.preset)
-	})
+	}
 	gflag.StringVarP(&o.cpuprofile, "cpuprofile", "", "", "")
 	o.lzma1.applyPreset(6)
-	gflag.Var(&o.lzma1, "lzma1", gflag.RequiredArg)
+	gflag.VarP(&o.lzma1, "lzma1", "", gflag.RequiredArg, "")
 	o.lzma2.applyPreset(6)
-	gflag.Var(&o.lzma2, "lzma2", gflag.RequiredArg)
+	gflag.VarP(&o.lzma2, "lzma2", "", gflag.RequiredArg, "")
 }
 
 // normalizeFormat normalizes the format field of options. If the

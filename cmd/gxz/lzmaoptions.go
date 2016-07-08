@@ -393,7 +393,7 @@ func (o *lzmaOptions) applyPreset(preset int) *lzmaOptions {
 	return o
 }
 
-func (o *lzmaOptions) Set(s string) error {
+func (o *lzmaOptions) Set(name, arg string) error {
 	var opts optionSet
 	opts.IntVar(&o.preset, "preset", o.preset)
 	opts.Int64ExtVar(&o.dictCap, "dict", o.dictCap)
@@ -405,7 +405,7 @@ func (o *lzmaOptions) Set(s string) error {
 	opts.IntVar(&o.niceLen, "nice", o.niceLen)
 	opts.IntVar(&o.depth, "depth", o.depth)
 	opts.SetAction("preset", func(*option) { o.applyPreset(o.preset) })
-	if err := opts.Parse(s); err != nil {
+	if err := opts.Parse(arg); err != nil {
 		return err
 	}
 	return nil
