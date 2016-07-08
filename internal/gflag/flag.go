@@ -5,9 +5,8 @@
 /*
 Package gflag implements GNU-style command line flag parsing. It
 supports the transformation of programs using the Go standard library
-flag package. But the package isn't fully compatible. For example the
-Flag structure is incomplete and the Var function does have a different
-signature.
+flag package. The package is not fully compatible. The Value interface
+is different and Flag has different fields.
 */
 package gflag
 
