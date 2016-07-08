@@ -21,7 +21,7 @@ type WriterConfig struct {
 	// checksum method: CRC32, CRC64 or SHA256
 	CheckSum byte
 	// match algorithm
-	Matcher lzma.MatchAlgorithm
+	Matcher lzma.MatchFinder
 }
 
 // fill replaces zero values with default values.

@@ -21,8 +21,8 @@ type Writer2Config struct {
 	// Size of the lookahead buffer; value 0 indicates default size
 	// 4096
 	BufSize int
-	// Match algorithm
-	Matcher MatchAlgorithm
+	// Match finder
+	Matcher MatchFinder
 }
 
 // fill replaces zero values with default values.

@@ -6,47 +6,47 @@ package lzma
 
 import "errors"
 
-// MatchAlgorithm identifies an algorithm to find matches in the
+// MatchFinder identifies an algorithm to find matches in the
 // dictionary.
-type MatchAlgorithm byte
+type MatchFinder byte
 
 // Supported matcher algorithms.
 const (
-	HashTable4 MatchAlgorithm = iota
+	HashTable4 MatchFinder = iota
 	BinaryTree
 )
 
 // maStrings are used by the String method.
-var maStrings = map[MatchAlgorithm]string{
+var maStrings = map[MatchFinder]string{
 	HashTable4: "HashTable4",
 	BinaryTree: "BinaryTree",
 }
 
 // String returns a string representation of the Matcher.
-func (a MatchAlgorithm) String() string {
+func (a MatchFinder) String() string {
 	if s, ok := maStrings[a]; ok {
 		return s
 	}
 	return "unknown"
 }
 
-var errUnsupportedMatchAlgorithm = errors.New(
-	"lzma: unsupported match algorithm value")
+var errUnsupportedMatchFinder = errors.New(
+	"lzma: unsupported match finder value")
 
 // verify checks whether the matcher value is supported.
-func (a MatchAlgorithm) verify() error {
+func (a MatchFinder) verify() error {
 	if _, ok := maStrings[a]; !ok {
-		return errUnsupportedMatchAlgorithm
+		return errUnsupportedMatchFinder
 	}
 	return nil
 }
 
-func (a MatchAlgorithm) new(dictCap int) (m matcher, err error) {
+func (a MatchFinder) new(dictCap int) (m matcher, err error) {
 	switch a {
 	case HashTable4:
 		return newHashTable(dictCap, 4)
 	case BinaryTree:
 		return newBinTree(dictCap)
 	}
-	return nil, errUnsupportedMatchAlgorithm
+	return nil, errUnsupportedMatchFinder
 }
