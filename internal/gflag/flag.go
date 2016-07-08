@@ -64,7 +64,7 @@ type Flag struct {
 	DefaultValue string
 	UsageFlags   string
 	Usage        string
-	Action       func (flag *Flag, name, arg string)
+	Action       func(flag *Flag, name, arg string)
 }
 
 func (f *Flag) usageFlags() string {
