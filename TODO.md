@@ -4,9 +4,11 @@
 
 1. Change matcher interface suppporting Depth and NiceLength
 
-    - return multiple matches one longer than the other
+    - make depth and niceLen an argument of MatchFinder.new 
 
-    - adapt current matchers accordingly
+    - implement FindMatches for both methods
+
+    - adapt encoder to use FindMatches
 
     - implement hash chain with multiple word length
 
@@ -16,7 +18,7 @@
                    3  2 and 3
                    4  2, 3 and 4
 
-    - analyze binary tree implementation in xz
+    - implement bt2-bt4 as well
 
 2. Move xb to `internal/_cmd` to prevent building with go install ./...
    in the xz package directory.
@@ -41,6 +43,7 @@
 
 1. Optimize code
 2. Do statistical analysis to get linear presets.
+
 3. Test sync.Pool compatability for xz and lzma Writer and Reader
 3. Fuzz optimized code.
 
