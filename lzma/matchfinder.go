@@ -41,6 +41,7 @@ func (a MatchFinder) verify() error {
 	return nil
 }
 
+// new creates the matcher based on the matchfinder value.
 func (a MatchFinder) new(dictCap int) (m matcher, err error) {
 	switch a {
 	case HashTable4:
