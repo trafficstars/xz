@@ -136,14 +136,13 @@ func TestFlagSet_String(t *testing.T) {
 }
 
 func TestFlagSet_Usage(t *testing.T) {
-	t.Skip("usage not implemented currently")
 	f := NewFlagSet("test", ContinueOnError)
 	f.IntP("test-a", "a", 3, "tests a")
 	f.CounterP("count-b", "b", 0, "counts b")
 	buf := new(bytes.Buffer)
 	f.SetOutput(buf)
-	f.usage()
-	t.Log(buf.String())
+	f.PrintDefaults()
+	t.Logf("\n%s", buf)
 }
 
 func TestFlagSet_Preset(t *testing.T) {

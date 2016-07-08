@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,34 +63,8 @@ type Flag struct {
 	HasArg       HasArg
 	Value        Value
 	DefaultValue string
-	UsageFlags   string
 	Usage        string
 	Action       func(flag *Flag, name, arg string)
-}
-
-func (f *Flag) usageFlags() string {
-	if f.UsageFlags != "" {
-		return f.UsageFlags
-	}
-	var buf bytes.Buffer
-	if f.Shorthands != "" {
-		for i, r := range f.Shorthands {
-			if i > 0 {
-				fmt.Fprint(&buf, ", ")
-			}
-			fmt.Fprintf(&buf, "-%c", r)
-		}
-	}
-	if f.Name != "" {
-		if buf.Len() > 0 {
-			fmt.Fprintf(&buf, ", ")
-		}
-		fmt.Fprint(&buf, "--", f.Name)
-		if f.DefaultValue != "" {
-			fmt.Fprintf(&buf, "=%s", f.DefaultValue)
-		}
-	}
-	return buf.String()
 }
 
 // FlagSet represents a set of option flags.
@@ -413,9 +388,117 @@ func Visit(fn func(*Flag)) {
 	CommandLine.Visit(fn)
 }
 
+// UnquoteUsage removes the backquotes from the usage message and
+// extracts the type name between backquotes.
+func UnquoteUsage(flag *Flag) (name string, usage string) {
+	usage = flag.Usage
+	for i := 0; i < len(usage); i++ {
+		if usage[i] == '`' {
+			for j := i + 1; j < len(usage); j++ {
+				if usage[j] == '`' {
+					name = usage[i+1 : j]
+					usage = usage[:i] + name + usage[j+1:]
+					return name, usage
+				}
+			}
+			break
+		}
+	}
+	name = "value"
+	switch flag.Value.(type) {
+	case *boolValue, *presetValue:
+		name = ""
+	case *intValue:
+		name = "int"
+	case *stringValue:
+		name = "string"
+	}
+	return name, usage
+}
+
+// flagString returns the string with the supported flags.
+func flagString(flag *Flag) string {
+	var buf bytes.Buffer
+	buf.Grow(40)
+	if flag.Name != "" {
+		fmt.Fprintf(&buf, "--%s", flag.Name)
+	}
+	shorthands := flag.Shorthands
+	if shorthands != "" {
+		_, ok := flag.Value.(*presetValue)
+		if ok && len(shorthands) > 1 {
+			if buf.Len() > 0 {
+				fmt.Fprint(&buf, ", ")
+			}
+			fmt.Fprintf(&buf, "-%c..%c",
+				shorthands[0], shorthands[len(shorthands)-1])
+		} else {
+			for _, r := range shorthands {
+				if buf.Len() > 0 {
+					fmt.Fprint(&buf, ", ")
+				}
+				fmt.Fprintf(&buf, "-%c", r)
+			}
+		}
+	}
+	return buf.String()
+}
+
+// isZeroValue checks whether the give value is the zero value of the
+// type.
+func isZeroValue(flag *Flag, value string) bool {
+	typ := reflect.TypeOf(flag.Value)
+	var z reflect.Value
+	if typ.Kind() == reflect.Ptr {
+		z = reflect.New(typ.Elem())
+	} else {
+		z = reflect.Zero(typ)
+	}
+	if value == z.Interface().(Value).String() {
+		return true
+	}
+
+	switch value {
+	case "false":
+		return true
+	case "":
+		return true
+	case "0":
+		return true
+	}
+	return false
+}
+
 // PrintDefaults prints information about all flags.
 func (f *FlagSet) PrintDefaults() {
-	panic("TODO")
+	f.VisitAll(func(flag *Flag) {
+		s := "  " + flagString(flag)
+		name, usage := UnquoteUsage(flag)
+		if len(name) > 0 {
+			switch flag.HasArg {
+			case RequiredArg:
+				s += " " + name
+			case OptionalArg:
+				s += " [" + name + "]"
+			}
+		}
+		if len(s) <= 4 {
+			s += "\t"
+		} else {
+			s += "\n    \t"
+		}
+		s += usage
+		if !isZeroValue(flag, flag.DefaultValue) {
+			if _, ok := flag.Value.(*stringValue); ok {
+				s += fmt.Sprintf(" (default %q)",
+					flag.DefaultValue)
+			} else {
+				s += fmt.Sprintf(" (default %v)",
+					flag.DefaultValue)
+			}
+		}
+		fmt.Fprint(f.out(), s, "\n")
+	})
 }
 
 // PrintDefaults prints the information about all command line flags.
