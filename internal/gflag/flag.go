@@ -65,6 +65,7 @@ type Flag struct {
 	DefaultValue string
 	UsageFlags   string
 	Usage        string
+	Action       func (flag *Flag, name, arg string)
 }
 
 func (f *Flag) usageFlags() string {
@@ -107,11 +108,19 @@ type FlagSet struct {
 	preset        bool
 }
 
-func (f *FlagSet) addActual(name string, flag *Flag) {
+func (f *FlagSet) setFlag(flag *Flag, name, arg string) error {
+	err := flag.Value.Set(name, arg)
+	if err != nil {
+		return err
+	}
 	if f.actual == nil {
 		f.actual = make(map[string]*Flag)
 	}
 	f.actual[name] = flag
+	if flag.Action != nil {
+		flag.Action(flag, name, arg)
+	}
+	return nil
 }
 
 // Init initializes a flag set variable.
@@ -205,22 +214,19 @@ func (f *FlagSet) lookupShortOption(r rune) (flag *Flag, err error) {
 func (f *FlagSet) processExtraFlagArg(name string, flag *Flag, i int) error {
 	if flag.HasArg == NoArg {
 		// no argument required
-		err := flag.Value.Set(name, "")
-		f.addActual(name, flag)
-		return err
+		return f.setFlag(flag, name, "")
 	}
 	if i < len(f.args) {
 		arg := f.args[i]
 		if len(arg) == 0 || arg[0] != '-' {
-			err := flag.Value.Set(name, arg)
-			f.addActual(name, flag)
+			err := f.setFlag(flag, name, arg)
 			switch flag.HasArg {
 			case RequiredArg:
 				f.removeArg(i)
 				return err
 			case OptionalArg:
 				if err != nil {
-					return flag.Value.Set(name, "")
+					return f.setFlag(flag, name, "")
 				}
 				f.removeArg(i)
 				return nil
@@ -232,9 +238,7 @@ func (f *FlagSet) processExtraFlagArg(name string, flag *Flag, i int) error {
 		return fmt.Errorf("flag %s lacks argument", name)
 	}
 	// flag.HasArg == OptionalArg
-	err := flag.Value.Set(name, "")
-	f.addActual(name, flag)
-	return err
+	return f.setFlag(flag, name, "")
 }
 
 // removeArg removes the arguments at position i from the args field of
@@ -274,8 +278,7 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 			err = fmt.Errorf("option %s doesn't support argument",
 				arg)
 		} else {
-			err = flag.Value.Set(flagArg[0], flagArg[1])
-			f.addActual(flagArg[0], flag)
+			err = f.setFlag(flag, flagArg[0], flagArg[1])
 		}
 		return i, err
 	}
