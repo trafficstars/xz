@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -98,11 +99,19 @@ type FlagSet struct {
 
 	name          string
 	parsed        bool
+	actual        map[string]*Flag
 	formal        map[string]*Flag
 	args          []string
 	output        io.Writer
 	errorHandling ErrorHandling
 	preset        bool
+}
+
+func (f *FlagSet) addActual(name string, flag *Flag) {
+	if f.actual == nil {
+		f.actual = make(map[string]*Flag)
+	}
+	f.actual[name] = flag
 }
 
 // Init initializes a flag set variable.
@@ -196,12 +205,15 @@ func (f *FlagSet) lookupShortOption(r rune) (flag *Flag, err error) {
 func (f *FlagSet) processExtraFlagArg(name string, flag *Flag, i int) error {
 	if flag.HasArg == NoArg {
 		// no argument required
-		return flag.Value.Set(name, "")
+		err := flag.Value.Set(name, "")
+		f.addActual(name, flag)
+		return err
 	}
 	if i < len(f.args) {
 		arg := f.args[i]
 		if len(arg) == 0 || arg[0] != '-' {
 			err := flag.Value.Set(name, arg)
+			f.addActual(name, flag)
 			switch flag.HasArg {
 			case RequiredArg:
 				f.removeArg(i)
@@ -220,7 +232,9 @@ func (f *FlagSet) processExtraFlagArg(name string, flag *Flag, i int) error {
 		return fmt.Errorf("flag %s lacks argument", name)
 	}
 	// flag.HasArg == OptionalArg
-	return flag.Value.Set(name, "")
+	err := flag.Value.Set(name, "")
+	f.addActual(name, flag)
+	return err
 }
 
 // removeArg removes the arguments at position i from the args field of
@@ -261,6 +275,7 @@ func (f *FlagSet) parseArg(i int) (next int, err error) {
 				arg)
 		} else {
 			err = flag.Value.Set(flagArg[0], flagArg[1])
+			f.addActual(flagArg[0], flag)
 		}
 		return i, err
 	}
@@ -332,6 +347,68 @@ func (f *FlagSet) Parse(arguments []string) error {
 		}
 	}
 	return nil
+}
+
+func flagKey(flag *Flag) string {
+	if flag.Name != "" {
+		return flag.Name
+	}
+	if flag.Shorthands == "" {
+		panic("flag without name or shorthands")
+	}
+	return flag.Shorthands[:1]
+}
+
+func sortFlags(flags map[string]*Flag) []*Flag {
+	// map that will contain each flag only once
+	m := make(map[string]*Flag)
+	for _, flag := range flags {
+		m[flagKey(flag)] = flag
+	}
+
+	// sort keys
+	list := make(sort.StringSlice, len(m))
+	i := 0
+	for k := range m {
+		list[i] = k
+		i++
+	}
+	list.Sort()
+
+	// create result list
+	result := make([]*Flag, len(list))
+	for i, key := range list {
+		result[i] = m[key]
+	}
+	return result
+}
+
+// VisitAll visits all flags in lexicographic order. The order is
+// determined by the flag name or its first shorthand.
+func (f *FlagSet) VisitAll(fn func(*Flag)) {
+	for _, flag := range sortFlags(f.formal) {
+		fn(flag)
+	}
+}
+
+// VisitAll visits all commandline flags in lexicographic order. The
+// order is determined by the flag name or its first shorthand.
+func VisitAll(fn func(*Flag)) {
+	CommandLine.VisitAll(fn)
+}
+
+// Visit visits the parsed flags in lexicographic order. The order is
+// determined by the flag name or its first shorthand.
+func (f *FlagSet) Visit(fn func(*Flag)) {
+	for _, flag := range sortFlags(f.actual) {
+		fn(flag)
+	}
+}
+
+// Visit visits the parsed commandline flags in lexicographic order. The
+// order is determined by the flag name or its first shorthand.
+func Visit(fn func(*Flag)) {
+	CommandLine.Visit(fn)
 }
 
 // PrintDefaults prints information about all flags.
