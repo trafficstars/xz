@@ -173,8 +173,8 @@ func (t *hashTable) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-// getMatches the matches for a specific hash. The functions returns the
-// number of positions found.
+// getMatches returns the matches for a specific hashi value. The
+// function returns the number of positions found.
 //
 // TODO: Make a getDistances because that we are actually interested in.
 func (t *hashTable) getMatches(h uint64, positions []int64) (n int) {
@@ -222,8 +222,8 @@ func (t *hashTable) hash(p []byte) uint64 {
 }
 
 // Matches fills the positions slice with potential matches. The
-// functions returns the number of positions filled into positions. The
-// byte slice p must have word length of the hash table.
+// functions returns the number of matches put into the positions slice. The
+// byte slice p must have the word length for the hash table.
 func (t *hashTable) Matches(p []byte, positions []int64) int {
 	if len(p) != t.wordLen {
 		panic(fmt.Errorf(
