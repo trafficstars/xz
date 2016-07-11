@@ -27,7 +27,7 @@ func (h Hash) DataLen() int {
 // after the update. The argument p might be shorter than the hash
 // value.
 func (h Hash) Compute(data []byte) int {
-	if len(data) < 2 {
+	if len(h) == 0 || len(data) < 2 {
 		return 0
 	}
 	n := len(h) + 1
