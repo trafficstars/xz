@@ -27,7 +27,14 @@
 4. Do some optimizations
     - rename operation action and make it a simple type of size 8
 
-5. Add thanks to README.md and list all developers that have reported
+5. Change API again
+
+```Go
+   func NewReaderCfg(xz io.Reader, cfg ReaderConfig) (r *Reader, err error)
+   func NewWriterCfg(xz io.Writer, cfg WriterConfig) (w *Writer, err error)
+```
+
+6. Add thanks to README.md and list all developers that have reported
    problems with the library.
 
 ## Release v0.7
