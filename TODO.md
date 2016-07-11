@@ -18,10 +18,15 @@
 
     - analyze binary tree implementation in xz
 
+2. Move xb to `internal/_cmd` to prevent building with go install ./...
+   in the xz package directory.
+
 3. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
+
 4. Do some optimizations
     - rename operation action and make it a simple type of size 8
+
 5. Add thanks to README.md and list all developers that have reported
    problems with the library.
 
