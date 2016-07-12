@@ -18,14 +18,14 @@ func MakeHash(n int) Hash {
 	return make(Hash, n-1)
 }
 
-// Returns the data length for the slice.
+// DataLen returns the data length for the slice.
 func (h Hash) DataLen() int {
 	return len(h) + 1
 }
 
-// Computes the hash values. It returns the number of entries valid
-// after the update. The argument p might be shorter than the hash
-// value.
+// Compute calculates the hash values for the data slice. It returns the
+// number of entries valid after the update. The argument p might be
+// shorter than the hash value.
 func (h Hash) Compute(data []byte) int {
 	if len(h) == 0 || len(data) < 2 {
 		return 0
