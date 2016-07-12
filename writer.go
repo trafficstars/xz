@@ -43,22 +43,13 @@ func (c *WriterConfig) fill() {
 	}
 }
 
-// Verify checks the configuration for errors. Zero values will be
+// verify checks the configuration for errors. Zero values will be
 // replaced by default values.
-func (c *WriterConfig) Verify() error {
+func (c *WriterConfig) verify() error {
 	if c == nil {
 		return errors.New("xz: writer configuration is nil")
 	}
 	c.fill()
-	lc := lzma.Writer2Config{
-		Properties: c.Properties,
-		DictCap:    c.DictCap,
-		BufSize:    c.BufSize,
-		Matcher:    c.Matcher,
-	}
-	if err := lc.Verify(); err != nil {
-		return err
-	}
 	if c.BlockSize <= 0 {
 		return errors.New("xz: block size out of range")
 	}
@@ -98,13 +89,13 @@ func verifyFilters(f []filter) error {
 
 // newFilterWriteCloser converts a filter list into a WriteCloser that
 // can be used by a blockWriter.
-func (c *WriterConfig) newFilterWriteCloser(w io.Writer, f []filter) (fw io.WriteCloser, err error) {
+func newFilterWriteCloser(w io.Writer, f []filter, cfg *WriterConfig) (fw io.WriteCloser, err error) {
 	if err = verifyFilters(f); err != nil {
 		return nil, err
 	}
 	fw = nopWriteCloser(w)
 	for i := len(f) - 1; i >= 0; i-- {
-		fw, err = f[i].writeCloser(fw, c)
+		fw, err = f[i].writeCloser(fw, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +122,7 @@ func nopWriteCloser(w io.Writer) io.WriteCloser {
 
 // Writer compresses data written to it. It is an io.WriteCloser.
 type Writer struct {
-	WriterConfig
+	cfg WriterConfig
 
 	xz      io.Writer
 	bw      *blockWriter
@@ -144,7 +135,7 @@ type Writer struct {
 // newBlockWriter creates a new block writer writes the header out.
 func (w *Writer) newBlockWriter() error {
 	var err error
-	w.bw, err = w.WriterConfig.newBlockWriter(w.xz, w.newHash())
+	w.bw, err = newBlockWriter(w.xz, w.newHash(), &w.cfg)
 	if err != nil {
 		return err
 	}
@@ -167,23 +158,23 @@ func (w *Writer) closeBlockWriter() error {
 
 // NewWriter creates a new xz writer using default parameters.
 func NewWriter(xz io.Writer) (w *Writer, err error) {
-	return WriterConfig{}.NewWriter(xz)
+	return NewWriterCfg(xz, WriterConfig{})
 }
 
-// NewWriter creates a new Writer using the given configuration
+// NewWriterCfg creates a new Writer using the given configuration
 // parameters. WriterConfig fields with zero values will be replaced by
 // default parameters.
-func (c WriterConfig) NewWriter(xz io.Writer) (w *Writer, err error) {
-	if err = c.Verify(); err != nil {
+func NewWriterCfg(xz io.Writer, cfg WriterConfig) (w *Writer, err error) {
+	if err = cfg.verify(); err != nil {
 		return nil, err
 	}
 	w = &Writer{
-		WriterConfig: c,
-		xz:           xz,
-		h:            header{c.CheckSum},
-		index:        make([]record, 0, 4),
+		cfg:   cfg,
+		xz:    xz,
+		h:     header{cfg.CheckSum},
+		index: make([]record, 0, 4),
 	}
-	if w.newHash, err = newHashFunc(c.CheckSum); err != nil {
+	if w.newHash, err = newHashFunc(cfg.CheckSum); err != nil {
 		return nil, err
 	}
 	data, err := w.h.MarshalBinary()
@@ -194,7 +185,6 @@ func (c WriterConfig) NewWriter(xz io.Writer) (w *Writer, err error) {
 		return nil, err
 	}
 	return w, nil
-
 }
 
 // Write compresses the uncompressed data provided.
@@ -275,14 +265,14 @@ type blockWriter struct {
 }
 
 // newBlockWriter creates a new block writer.
-func (c *WriterConfig) newBlockWriter(xz io.Writer, hash hash.Hash) (bw *blockWriter, err error) {
+func newBlockWriter(xz io.Writer, hash hash.Hash, cfg *WriterConfig) (bw *blockWriter, err error) {
 	bw = &blockWriter{
 		cxz:       countingWriter{w: xz},
-		blockSize: c.BlockSize,
-		filters:   c.filters(),
+		blockSize: cfg.BlockSize,
+		filters:   cfg.filters(),
 		hash:      hash,
 	}
-	bw.w, err = c.newFilterWriteCloser(&bw.cxz, bw.filters)
+	bw.w, err = newFilterWriteCloser(&bw.cxz, bw.filters, cfg)
 	if err != nil {
 		return nil, err
 	}

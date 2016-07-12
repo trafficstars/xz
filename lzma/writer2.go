@@ -38,9 +38,9 @@ func (c *Writer2Config) fill() {
 	}
 }
 
-// Verify checks the Writer2Config for correctness. Zero values will be
+// verify checks the Writer2Config for correctness. Zero values will be
 // replaced by default values.
-func (c *Writer2Config) Verify() error {
+func (c *Writer2Config) verify() error {
 	c.fill()
 	var err error
 	if c == nil {
@@ -92,27 +92,27 @@ type Writer2 struct {
 // NewWriter2 creates an LZMA2 chunk sequence writer with the default
 // parameters and options.
 func NewWriter2(lzma2 io.Writer) (w *Writer2, err error) {
-	return Writer2Config{}.NewWriter2(lzma2)
+	return NewWriter2Cfg(lzma2, Writer2Config{})
 }
 
-// NewWriter2 creates a new LZMA2 writer using the given configuration.
-func (c Writer2Config) NewWriter2(lzma2 io.Writer) (w *Writer2, err error) {
-	if err = c.Verify(); err != nil {
+// NewWriter2Cfg creates a new LZMA2 writer using the given configuration.
+func NewWriter2Cfg(lzma2 io.Writer, cfg Writer2Config) (w *Writer2, err error) {
+	if err = cfg.verify(); err != nil {
 		return nil, err
 	}
 	w = &Writer2{
 		w:      lzma2,
-		start:  newState(*c.Properties),
+		start:  newState(*cfg.Properties),
 		cstate: start,
 		ctype:  start.defaultChunkType(),
 	}
 	w.buf.Grow(maxCompressed)
 	w.lbw = LimitedByteWriter{BW: &w.buf, N: maxCompressed}
-	m, err := c.Matcher.new(c.DictCap)
+	m, err := cfg.Matcher.new(cfg.DictCap)
 	if err != nil {
 		return nil, err
 	}
-	d, err := newEncoderDict(c.DictCap, c.BufSize, m)
+	d, err := newEncoderDict(cfg.DictCap, cfg.BufSize, m)
 	if err != nil {
 		return nil, err
 	}

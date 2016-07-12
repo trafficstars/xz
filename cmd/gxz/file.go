@@ -54,33 +54,33 @@ type format struct {
 // sizes.
 var lzmaDictCapExps = []uint{18, 20, 21, 22, 22, 23, 23, 24, 25, 26}
 
-// newLZMAWriterConfig converts options into an lzma.WriterConfig.
-func newLZMAWriterConfig(opts *options) *lzma.WriterConfig {
-	return &lzma.WriterConfig{
+// lzmaWriterConfig converts options into an lzma.WriterConfig.
+func lzmaWriterConfig(opts *options) lzma.WriterConfig {
+	return lzma.WriterConfig{
 		Properties: opts.lzma1.Properties(),
 		DictCap:    opts.lzma1.DictCap(),
 	}
 
 }
 
-// newLZMAReaderConfig converts options into an lzma.ReaderConfig.
-func newLZMAReaderConfig(opts *options) *lzma.ReaderConfig {
-	return &lzma.ReaderConfig{
+// lzmaReaderConfig converts options into an lzma.ReaderConfig.
+func lzmaReaderConfig(opts *options) lzma.ReaderConfig {
+	return lzma.ReaderConfig{
 		DictCap: opts.lzma1.DictCap(),
 	}
 }
 
-// newXZWriterConfig converts options into an xz.WriterConfig.
-func newXZWriterConfig(opts *options) *xz.WriterConfig {
-	return &xz.WriterConfig{
+// xzWriterConfig converts options into an xz.WriterConfig.
+func xzWriterConfig(opts *options) xz.WriterConfig {
+	return xz.WriterConfig{
 		Properties: opts.lzma2.Properties(),
 		DictCap:    opts.lzma2.DictCap(),
 	}
 }
 
-// newXZReaderConfig converts options into an xz.ReaderConfig.
-func newXZReaderConfig(opts *options) *xz.ReaderConfig {
-	return &xz.ReaderConfig{
+// xzReaderConfig converts options into an xz.ReaderConfig.
+func xzReaderConfig(opts *options) xz.ReaderConfig {
+	return xz.ReaderConfig{
 		DictCap: opts.lzma2.DictCap(),
 	}
 }
@@ -90,11 +90,11 @@ var formats = map[string]*format{
 	"lzma": &format{
 		newCompressor: func(w io.Writer, opts *options,
 		) (c io.WriteCloser, err error) {
-			return newLZMAWriterConfig(opts).NewWriter(w)
+			return lzma.NewWriterCfg(w, lzmaWriterConfig(opts))
 		},
 		newDecompressor: func(r io.Reader, opts *options,
 		) (d io.Reader, err error) {
-			return newLZMAReaderConfig(opts).NewReader(r)
+			return lzma.NewReaderCfg(r, lzmaReaderConfig(opts))
 		},
 		validHeader: func(br *bufio.Reader) bool {
 			h, err := br.Peek(lzma.HeaderLen)
@@ -107,11 +107,11 @@ var formats = map[string]*format{
 	"xz": &format{
 		newCompressor: func(w io.Writer, opts *options,
 		) (c io.WriteCloser, err error) {
-			return newXZWriterConfig(opts).NewWriter(w)
+			return xz.NewWriterCfg(w, xzWriterConfig(opts))
 		},
 		newDecompressor: func(r io.Reader, opts *options,
 		) (d io.Reader, err error) {
-			return newXZReaderConfig(opts).NewReader(r)
+			return xz.NewReaderCfg(r, xzReaderConfig(opts))
 		},
 		validHeader: func(br *bufio.Reader) bool {
 			h, err := br.Peek(xz.HeaderLen)

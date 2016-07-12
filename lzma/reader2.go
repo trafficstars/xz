@@ -24,9 +24,9 @@ func (c *Reader2Config) fill() {
 	}
 }
 
-// Verify checks the reader configuration for errors. Zero configuration values
+// verify checks the reader configuration for errors. Zero configuration values
 // will be replaced by default values.
-func (c *Reader2Config) Verify() error {
+func (c *Reader2Config) verify() error {
 	c.fill()
 	if !(MinDictCap <= c.DictCap && c.DictCap <= MaxDictCap) {
 		return errors.New("lzma: dictionary capacity is out of range")
@@ -53,16 +53,16 @@ type Reader2 struct {
 
 // NewReader2 creates a reader for an LZMA2 chunk sequence.
 func NewReader2(lzma2 io.Reader) (r *Reader2, err error) {
-	return Reader2Config{}.NewReader2(lzma2)
+	return NewReader2Cfg(lzma2, Reader2Config{})
 }
 
-// NewReader2 creates an LZMA2 reader using the given configuration.
-func (c Reader2Config) NewReader2(lzma2 io.Reader) (r *Reader2, err error) {
-	if err = c.Verify(); err != nil {
+// NewReader2Cfg creates an LZMA2 reader using the given configuration.
+func NewReader2Cfg(lzma2 io.Reader, cfg Reader2Config) (r *Reader2, err error) {
+	if err = cfg.verify(); err != nil {
 		return nil, err
 	}
 	r = &Reader2{r: lzma2, cstate: start}
-	r.dict, err = newDecoderDict(c.DictCap)
+	r.dict, err = newDecoderDict(cfg.DictCap)
 	if err != nil {
 		return nil, err
 	}
