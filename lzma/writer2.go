@@ -21,8 +21,8 @@ type Writer2Config struct {
 	// Size of the lookahead buffer; value 0 indicates default size
 	// 4096
 	BufSize int
-	// Match finder
-	Matcher MatchFinder
+	// Match finder algorithm
+	MatchFinder MatchFinder
 }
 
 // fill replaces zero values with default values.
@@ -36,6 +36,7 @@ func (c *Writer2Config) fill() {
 	if c.BufSize == 0 {
 		c.BufSize = 4096
 	}
+	// TODO: set proper match finder
 }
 
 // verify checks the Writer2Config for correctness. Zero values will be
@@ -61,7 +62,7 @@ func (c *Writer2Config) verify() error {
 	if c.Properties.LC+c.Properties.LP > 4 {
 		return errors.New("lzma: sum of lc and lp exceeds 4")
 	}
-	if err = c.Matcher.verify(); err != nil {
+	if err = c.MatchFinder.verify(); err != nil {
 		return err
 	}
 	return nil
@@ -108,7 +109,7 @@ func NewWriter2Cfg(lzma2 io.Writer, cfg Writer2Config) (w *Writer2, err error) {
 	}
 	w.buf.Grow(maxCompressed)
 	w.lbw = LimitedByteWriter{BW: &w.buf, N: maxCompressed}
-	m, err := cfg.Matcher.new(cfg.DictCap)
+	m, err := cfg.MatchFinder.new(cfg.DictCap)
 	if err != nil {
 		return nil, err
 	}

@@ -89,10 +89,10 @@ func (f lzmaFilter) writeCloser(w io.WriteCloser, c *WriterConfig,
 	var cfg lzma.Writer2Config
 	if c != nil {
 		cfg = lzma.Writer2Config{
-			Properties: c.Properties,
-			DictCap:    c.DictCap,
-			BufSize:    c.BufSize,
-			Matcher:    c.Matcher,
+			Properties:  c.Properties,
+			DictCap:     c.DictCap,
+			BufSize:     c.BufSize,
+			MatchFinder: c.MatchFinder,
 		}
 	}
 

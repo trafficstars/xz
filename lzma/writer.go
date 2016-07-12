@@ -28,8 +28,8 @@ type WriterConfig struct {
 	// Size of the lookahead buffer; value 0 indicates default size
 	// 4096
 	BufSize int
-	// Match finder
-	Matcher MatchFinder
+	// Match finder algorithm
+	MatchFinder MatchFinder
 	// SizeInHeader indicates that the header will contain an
 	// explicit size.
 	SizeInHeader bool
@@ -59,6 +59,7 @@ func (c *WriterConfig) fill() {
 	if !c.SizeInHeader {
 		c.EOSMarker = true
 	}
+	// TODO: set proper MatchFinder
 }
 
 // verify checks WriterConfig for errors. Verify will replace zero
@@ -88,7 +89,7 @@ func (c *WriterConfig) verify() error {
 	} else if !c.EOSMarker {
 		return errors.New("lzma: EOS marker is required")
 	}
-	if err = c.Matcher.verify(); err != nil {
+	if err = c.MatchFinder.verify(); err != nil {
 		return err
 	}
 
@@ -131,7 +132,7 @@ func NewWriterCfg(lzma io.Writer, cfg WriterConfig) (w *Writer, err error) {
 		w.bw = w.buf
 	}
 	state := newState(w.h.properties)
-	m, err := cfg.Matcher.new(w.h.dictCap)
+	m, err := cfg.MatchFinder.new(w.h.dictCap)
 	if err != nil {
 		return nil, err
 	}

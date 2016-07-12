@@ -20,8 +20,8 @@ type WriterConfig struct {
 	BlockSize  int64
 	// checksum method: CRC32, CRC64 or SHA256
 	CheckSum byte
-	// match algorithm
-	Matcher lzma.MatchFinder
+	// match finder algorithm
+	MatchFinder lzma.MatchFinder
 }
 
 // fill replaces zero values with default values.
