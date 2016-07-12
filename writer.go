@@ -187,6 +187,9 @@ func (c WriterConfig) NewWriter(xz io.Writer) (w *Writer, err error) {
 		return nil, err
 	}
 	data, err := w.h.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
 	if _, err = xz.Write(data); err != nil {
 		return nil, err
 	}
