@@ -32,6 +32,13 @@ const (
 	eosMarker encoderFlags = 1 << iota
 )
 
+// matcher2 provides the capability to find matches in the dictionary.
+type matcher2 interface {
+	dict() *dict
+	findMatches(m []match) int
+	skip(n int)
+}
+
 // Encoder compresses data buffered in the encoder dictionary and writes
 // it into a byte writer.
 type encoder struct {

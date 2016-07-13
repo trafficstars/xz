@@ -43,3 +43,15 @@ func nlz32(x uint32) int {
 	x *= ntz32Const
 	return 32 - int(ntz32Table[x>>27])
 }
+
+// clp2u32 rounds up to the next power of 2.
+func clp2u32(x uint32) uint32 {
+	x--
+	x |= x >> 1
+	x |= x >> 2
+	x |= x >> 4
+	x |= x >> 8
+	x |= x >> 16
+	x++
+	return x
+}
