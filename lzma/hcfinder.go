@@ -4,13 +4,19 @@ import (
 	"github.com/ulikunitz/xz/internal/buz"
 )
 
+// Maximum value. The maximum table len results in a 512 MiB table field
+// for type htable and a 256 MiB table for type hchain.
 const (
 	maxUint32   = 1<<32 - 1
 	maxTableLen = 1 << 26
 )
 
+// load provides the limit for the load of a hash table. Is the load
+// higher the table size will be doubled.
 const load float64 = 0.75
 
+// ptr is a reference to the actual dictionary. Since we need a zero
+// value for an uninitialized pointer, we increase index values by 1.
 type ptr uint32
 
 // pointer converts an index into a pointer. The pointer returned is
@@ -22,6 +28,8 @@ func pointer(idx int) ptr {
 	return ptr(idx + 1)
 }
 
+// index returns the index value of the pointer. The function panics if
+// called for a zero value pointer.
 func (p ptr) index() int {
 	if p == 0 {
 		panic("no index for null pointer")
@@ -29,11 +37,15 @@ func (p ptr) index() int {
 	return int(p - 1)
 }
 
+// htEntry describes an entry into the hash table. The key is stored to
+// support resizing.
 type htEntry struct {
 	key uint32
 	p   ptr
 }
 
+// htable provides a simple hash table. Old values for the same slot
+// will be forgotten.
 type htable struct {
 	table   []htEntry
 	entries int
@@ -41,6 +53,9 @@ type htable struct {
 	mask    uint32
 }
 
+// resize changes the size of the table. While it is possible to
+// decrease the size of an hash table, expect the hash table to lose
+// entries and a resize during the next put call.
 func (h *htable) resize(n int) {
 	if n == 0 {
 		*h = htable{}
@@ -67,6 +82,8 @@ func (h *htable) resize(n int) {
 	}
 }
 
+// put makes an entry in the hash table. The table might be resized by the
+// function. The old entry in the slot might be overwritten.
 func (h *htable) put(key uint32, p ptr) {
 	if p == 0 {
 		panic("null pointer not supported")
@@ -87,16 +104,20 @@ func (h *htable) put(key uint32, p ptr) {
 	*e = htEntry{key: key, p: p}
 }
 
+// get returns the pointer for key if available.
 func (h *htable) get(key uint32) (p ptr, ok bool) {
 	p = h.table[key&h.mask].p
 	return p, p != 0
 }
 
+// hcEntry describes an entry in the chain field of the hchain type.
 type hcEntry struct {
 	key  uint32
 	next ptr
 }
 
+// hchain provides a hash table with chained hashing. The table might be
+// resized during usage.
 type hchain struct {
 	table   []ptr
 	chain   []hcEntry
@@ -105,7 +126,10 @@ type hchain struct {
 	mask    uint32
 }
 
-func newHChain(dictCap int, tableLen int) *hchain {
+// newHChain creates a new instance for a hash chain. The dictSize
+// describes the complete size, dictCap + bufSize,  of the dictionary to
+// be able to address all bytes of it.
+func newHChain(dictSize int, tableLen int) *hchain {
 	if tableLen < 4 {
 		tableLen = 256
 	}
@@ -121,6 +145,7 @@ func newHChain(dictCap int, tableLen int) *hchain {
 	}
 }
 
+// resize changes the size of the hash chain.
 func (h *hchain) resize(n int) {
 	if n < 4 {
 		n = 256
@@ -149,6 +174,8 @@ func (h *hchain) resize(n int) {
 	}
 }
 
+// put puts aan entry into the hash chain. The old entry for the pointer
+// will be removed.
 func (h *hchain) put(key uint32, p ptr) {
 	if p == 0 {
 		panic("null pointer not supported")
@@ -182,6 +209,7 @@ func (h *hchain) put(key uint32, p ptr) {
 	*e = hcEntry{key, next}
 }
 
+// get returns the the pointers found for the key.
 func (h *hchain) get(key uint32, ptrs []ptr) int {
 	n := 0
 	p := h.table[key&h.mask]
