@@ -10,8 +10,8 @@ import (
 )
 
 func peek(d *decoderDict) []byte {
-	p := make([]byte, d.buffered())
-	k, err := d.peek(p)
+	p := make([]byte, d.Buffered())
+	k, err := d.Peek(p)
 	if err != nil {
 		panic(fmt.Errorf("peek: "+
 			"Read returned unexpected error %s", err))
