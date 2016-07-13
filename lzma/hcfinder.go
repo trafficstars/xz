@@ -1,6 +1,8 @@
 package lzma
 
 import (
+	"errors"
+
 	"github.com/ulikunitz/xz/internal/buz"
 )
 
@@ -113,6 +115,7 @@ func (h *htable) get(key uint32) (p ptr, ok bool) {
 // hcEntry describes an entry in the chain field of the hchain type.
 type hcEntry struct {
 	key  uint32
+	prev ptr
 	next ptr
 }
 
@@ -138,7 +141,7 @@ func newHChain(dictSize int, tableLen int) *hchain {
 	}
 	n := int(clp2u32(uint32(tableLen)))
 	return &hchain{
-		chain: make([]hcEntry, dictCap),
+		chain: make([]hcEntry, dictSize),
 		table: make([]ptr, n),
 		mask:  uint32(n - 1),
 		max:   int(load * float64(n)),
@@ -154,28 +157,82 @@ func (h *hchain) resize(n int) {
 		panic("n out of range")
 	}
 	n = int(clp2u32(uint32(n)))
+	t := h.table
+	h.table = make([]ptr, n)
 	h.mask = uint32(n - 1)
 	h.max = int(load * float64(n))
 	h.entries = 0
-	t := h.table
-	h.table = make([]ptr, n)
-	for _, p := range t {
-		for p != 0 {
-			e := &h.chain[p.index()]
-			pptr := &h.table[e.key&h.mask]
-			next := *pptr
-			if next == 0 {
-				h.entries++
+	for _, head := range t {
+		if head == 0 {
+			continue
+		}
+		e := h.chain[head.index()]
+		p := e.prev
+		tail := p
+		for {
+			e = h.chain[p.index()]
+			prev := e.prev
+			h._put(e.key, p)
+			p = prev
+			if p == tail {
+				break
 			}
-			*pptr = p
-			p = e.next
-			e.next = next
 		}
 	}
 }
 
-// put puts aan entry into the hash chain. The old entry for the pointer
-// will be removed.
+// removes pointer from hash chain
+func (h *hchain) remove(p ptr) {
+	if p == 0 {
+		return
+	}
+	e := &h.chain[p.index()]
+	if e.next == 0 {
+		return
+	}
+	// handle head entry
+	head := &h.table[e.key&h.mask]
+	if p == *head {
+		if p != e.next {
+			*head = e.next
+		} else {
+			h.entries--
+			*head = 0
+		}
+	}
+	if p != e.next {
+		eprev := &h.chain[e.prev.index()]
+		enext := &h.chain[e.next.index()]
+		eprev.next = e.next
+		enext.prev = e.prev
+	}
+	*e = hcEntry{}
+}
+
+func (h *hchain) _put(key uint32, p ptr) {
+	if p == 0 {
+		panic(errors.New("_put: null pointer argument"))
+	}
+	head := &h.table[key&h.mask]
+	e := &h.chain[p.index()]
+	e.key = key
+	if *head == 0 {
+		e.prev, e.next = p, p
+		*head = p
+	} else {
+		e.next = *head
+		enext := &h.chain[head.index()]
+		*head = p
+		e.prev = enext.prev
+		eprev := &h.chain[e.prev.index()]
+		enext.prev = p
+		eprev.next = p
+	}
+}
+
+// put puts aan entry into the hash chain. The old chain will still
+// reference it, but the get function will take care of it. It assumes
+// that all entries after p in the chain are not relevant anymore.
 func (h *hchain) put(key uint32, p ptr) {
 	if p == 0 {
 		panic("null pointer not supported")
@@ -190,39 +247,31 @@ func (h *hchain) put(key uint32, p ptr) {
 		}
 		h.resize(n)
 	}
-	e := &h.chain[p.index()]
-	// remove old table entry
-	pptr := &h.table[e.key&h.mask]
-	if *pptr == p {
-		if e.next == 0 {
-			h.entries--
-		}
-		*pptr = e.next
-	}
-	// add p to table
-	pptr = &h.table[key&h.mask]
-	next := *pptr
-	if next == 0 {
-		h.entries++
-	}
-	*pptr = p
-	*e = hcEntry{key, next}
+	h.remove(p)
+	h._put(key, p)
 }
 
 // get returns the the pointers found for the key.
 func (h *hchain) get(key uint32, ptrs []ptr) int {
+	head := h.table[key&h.mask]
+	if head == 0 {
+		return 0
+	}
 	n := 0
-	p := h.table[key&h.mask]
+	p := head
 	for {
-		if p == 0 {
-			return n
-		}
-		ptrs[n] = p
-		n++
-		if n >= len(ptrs) {
-			return n
+		e := h.chain[p.index()]
+		if e.key == key {
+			ptrs[n] = p
+			n++
+			if n >= len(ptrs) {
+				return n
+			}
 		}
 		p = h.chain[p.index()].next
+		if p == head {
+			return n
+		}
 	}
 }
 

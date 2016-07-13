@@ -24,8 +24,8 @@ func TestHTable(t *testing.T) {
 
 func TestHChain(t *testing.T) {
 	hc := newHChain(2, 256)
-	hc.put(0,pointer(0))
-	hc.put(0,pointer(1))
+	hc.put(0, pointer(0))
+	hc.put(0, pointer(1))
 	hc.resize(512)
 	ptrs := make([]ptr, 4)
 	n := hc.get(0, ptrs)
