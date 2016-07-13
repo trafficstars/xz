@@ -121,3 +121,17 @@ func (d *dict) copyN(w io.Writer, n int) (written int, err error) {
 
 // Buffered returns the number of bytes in the buffer.
 func (d *dict) Buffered() int { return d.buf.Buffered() }
+
+func (d *dict) Peek(p []byte) (n int, err error) { return d.buf.Peek(p) }
+
+func (d *dict) Discard(n int) (discarded int, err error) {
+	discarded, err = d.buf.Discard(n)
+	d.head += int64(discarded)
+	return discarded, err
+}
+
+func (d *dict) Read(p []byte) (n int, err error) {
+	n, err = d.buf.Read(p)
+	d.head += int64(n)
+	return n, err
+}
