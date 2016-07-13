@@ -54,7 +54,7 @@ func (d *dict) dictLen() int {
 
 // Available returns the number of bytes that can be written by a
 // following Write call.
-func (d *dict) available() int {
+func (d *dict) Available() int {
 	return d.buf.Available() - d.dictLen()
 }
 
@@ -62,7 +62,7 @@ func (d *dict) available() int {
 // of the dictionary head will not be moved. If there is not enough
 // space in the buffer ErrNoSpace will be returned.
 func (d *dict) Write(p []byte) (n int, err error) {
-	m := d.available()
+	m := d.Available()
 	if len(p) > m {
 		p = p[:m]
 		err = ErrNoSpace
@@ -120,4 +120,4 @@ func (d *dict) copyN(w io.Writer, n int) (written int, err error) {
 }
 
 // Buffered returns the number of bytes in the buffer.
-func (d *dict) buffered() int { return d.buf.Buffered() }
+func (d *dict) Buffered() int { return d.buf.Buffered() }
