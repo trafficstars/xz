@@ -35,7 +35,7 @@ func cycle(t *testing.T, n int) {
 			len(testString))
 	}
 	const dictCap = MinDictCap
-	m, err := HashTable4.new(dictCap)
+	m, err := HashChain4.new(dictCap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestEncoderCycle2(t *testing.T) {
 	txt := buf.String()
 	buf.Reset()
 	const dictCap = MinDictCap
-	m, err := HashTable4.new(dictCap)
+	m, err := HashChain4.new(dictCap)
 	if err != nil {
 		t.Fatal(err)
 	}

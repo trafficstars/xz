@@ -9,26 +9,18 @@ import "errors"
 // MatchFinder identifies the algorithm to be used for finding matches.
 type MatchFinder byte
 
-// Supported legacy match finders.
-const (
-	HashTable4 MatchFinder = iota
-	BinaryTree
-)
-
 // Match finders supported by NewWriterCfg.
 const (
 	HashChain2 MatchFinder = 0x02
-	HashChain3             = 0x03
-	HashChain4             = 0x04
-	BinTree2               = 0x12
-	BinTree3               = 0x13
-	BinTree4               = 0x14
+	HashChain3 MatchFinder = 0x03
+	HashChain4 MatchFinder = 0x04
+	BinTree2   MatchFinder = 0x12
+	BinTree3   MatchFinder = 0x13
+	BinTree4   MatchFinder = 0x14
 )
 
 // maStrings are used by the String method.
 var maStrings = map[MatchFinder]string{
-	HashTable4: "HashTable4",
-	BinaryTree: "BinaryTree",
 	HashChain2: "HashChain2",
 	HashChain3: "HashChain3",
 	HashChain4: "HashChain4",
@@ -63,8 +55,12 @@ func (a MatchFinder) verify() error {
 func (a MatchFinder) new(dictCap int) (m matcher, err error) {
 	/* TODO: make this a WriterConfig and Writer2Config operation */
 	switch a {
-	case HashTable4:
+	case 0, HashChain4:
 		return newHCFinder(4, dictCap, 4096, 200, 20)
+	case HashChain3:
+		return newHCFinder(3, dictCap, 4096, 200, 20)
+	case HashChain2:
+		return newHCFinder(2, dictCap, 4096, 200, 20)
 	}
 	return nil, errUnsupportedMatchFinder
 }
