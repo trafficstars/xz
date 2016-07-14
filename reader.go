@@ -160,9 +160,6 @@ func newStreamReader(xz io.Reader, cfg *ReaderConfig) (r *streamReader, err erro
 	return r, nil
 }
 
-// errIndex indicates an error with the xz file index.
-var errIndex = errors.New("xz: error in xz file index")
-
 // readTail reads the index body and the xz footer.
 func (r *streamReader) readTail() error {
 	index, n, err := readIndexBody(r.xz)
@@ -305,10 +302,6 @@ func (br *blockReader) unpaddedSize() int64 {
 func (br *blockReader) record() record {
 	return record{br.unpaddedSize(), br.uncompressedSize()}
 }
-
-// errBlockSize indicates that the size of the block in the block header
-// is wrong.
-var errBlockSize = errors.New("xz: wrong uncompressed size for block")
 
 // Read reads data from the block.
 func (br *blockReader) Read(p []byte) (n int, err error) {
