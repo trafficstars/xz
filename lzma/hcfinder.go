@@ -393,7 +393,7 @@ func (f *hcFinder) betterMatch(p ptr, maxLen int) (m match, ok bool) {
 	if dist < 0 {
 		dist += len(buf.data)
 	}
-	if !(1 <= dist && dist <= f.dict.Len()) {
+	if !(1 <= dist && dist <= f.dict.dictLen()) {
 		return m, false
 	}
 	if f.dict.ByteAt(dist-maxLen) != f.data[maxLen] {
@@ -464,7 +464,9 @@ func (f *hcFinder) FindMatches(m []match) int {
 	}
 	f.hash.Compute(f.data[:k])
 	n := f.onlyfindMatches(m)
-	f.enterHashes()
-	f.ahead++
+	if f.ahead == 0 {
+		f.enterHashes()
+		f.ahead++
+	}
 	return n
 }

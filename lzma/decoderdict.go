@@ -78,7 +78,7 @@ func (d *decoderDict) byteAt(dist int) byte {
 // first.
 func (d *decoderDict) writeMatch(dist int64, length int) error {
 	if !(0 < dist && dist <= int64(d.dictLen())) {
-		return errors.New("writeMatch: distance out of range")
+		return fmt.Errorf("writeMatch: distance %d out of range", dist)
 	}
 	if !(0 < length && length <= maxMatchLen) {
 		return errors.New("writeMatch: length out of range")
