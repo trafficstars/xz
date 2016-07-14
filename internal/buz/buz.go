@@ -19,7 +19,7 @@ func (h *Hash) SetDataLen(n int) {
 	if n < 2 {
 		*h = nil
 	}
-	*h = make(Hash, n-1)
+	*h = make(Hash, 0, n-1)
 }
 
 // MakeHash creates a new hash with the data length n.
@@ -34,24 +34,26 @@ func (h Hash) DataLen() int {
 	if h == nil {
 		return 0
 	}
-	return len(h) + 1
+	return cap(h) + 1
 }
 
-// Compute calculates the hash values for the data slice. It returns the
-// number of entries valid after the update. The argument p might be
-// shorter than the hash value.
-func (h Hash) Compute(data []byte) int {
-	if len(h) == 0 || len(data) < 2 {
-		return 0
+// Compute calculates the hash values for the data slice. The hash
+// slice is adapted to contain only the valid hashes.
+func (h *Hash) Compute(data []byte) {
+	if cap(*h) == 0 || len(data) < 2 {
+		return
 	}
-	n := len(h) + 1
-	if n < len(data) {
+	n := cap(*h) + 1
+	switch {
+	case n < len(data):
 		data = data[:n]
+	case n > len(data):
+		n = len(data)
 	}
+	*h = (*h)[:n-1]
 	g := table[data[0]]
 	for i, b := range data[1:] {
 		g = (g<<1 | g>>31) ^ table[b]
-		h[i] = g
+		(*h)[i] = g
 	}
-	return len(data) - 1
 }
