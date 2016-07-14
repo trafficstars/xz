@@ -10,6 +10,10 @@
 
     - implement bt2-bt4 as well
 
+2. Support parameters in gxz tool.
+
+   -> Support presets in the package.
+
 2. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
 
