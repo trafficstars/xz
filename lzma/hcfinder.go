@@ -2,6 +2,7 @@ package lzma
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ulikunitz/xz/internal/buz"
 )
@@ -108,6 +109,9 @@ func (h *htable) put(key uint32, p ptr) {
 
 // get returns the pointer for key if available.
 func (h *htable) get(key uint32) (p ptr, ok bool) {
+	if len(h.table) == 0 {
+		return 0, false
+	}
 	p = h.table[key&h.mask].p
 	return p, p != 0
 }
@@ -276,13 +280,11 @@ func (h *hchain) get(key uint32, ptrs []ptr) int {
 }
 
 type hcFinder struct {
-	// word length for the hasd chain
-	n int
 	// dictionary providing Write, Pos, ByteAt and CopyN
 	dict *dict
 	// slice with hash values
 	hash buz.Hash
-	// number of bytes that the hasher is in front of pos();
+	// number of bytes that the finder is in front of dict.pos();
 	// supports hashing in FindMatches
 	ahead int
 	// hash tables for non-maximum hash sizes; starting with word
@@ -290,9 +292,180 @@ type hcFinder struct {
 	ht []htable
 	// table of hash entries
 	hc *hchain
+	// word length for the hasd chain
+	n       int
+	niceLen int
+	// preallocated array; len(ptrs) == depth
+	ptrs []ptr
+	// preallocated data having word lenght
+	data []byte
 }
 
-func newHCFinder(dictCap int, bufSize int, niceLen int, depth int,
+func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 ) (hc *hcFinder, err error) {
-	panic("TODO")
+	if n < 2 {
+		return nil, errors.New(
+			"lzma: word length n must be greater or equal 2")
+	}
+	if !(2 <= niceLen && niceLen <= maxMatchLen) {
+		return nil, fmt.Errorf(
+			"lzma: niceLen must be in [%d,%d]", 2, maxMatchLen)
+	}
+	if depth < 1 {
+		return nil, errors.New("lzma: depth must be larger or equal 1")
+	}
+	dict, err := newDict(dictCap, bufSize)
+	if err != nil {
+		return nil, err
+	}
+	f := &hcFinder{
+		n:       n,
+		niceLen: niceLen,
+		dict:    dict,
+		hash:    buz.MakeHash(n),
+		ht:      make([]htable, n-2),
+		hc:      newHChain(dict.buf.Cap(), 1<<18),
+		ptrs:    make([]ptr, depth),
+		data:    make([]byte, niceLen),
+	}
+	for i := range f.ht {
+		f.ht[i].resize(1 << (10 + 2*uint(i)))
+	}
+	return f, nil
+}
+
+func (f *hcFinder) Dict() *dict {
+	return f.dict
+}
+
+func (f *hcFinder) mustDiscard(n int) {
+	discarded, err := f.dict.Discard(n)
+	if err != nil {
+		panic(err)
+	}
+	if discarded != n {
+		panic(fmt.Errorf("Discard returned %d; want %d", discarded, n))
+	}
+}
+
+func (f *hcFinder) enterHashes() {
+	for i, h := range f.hash {
+		p := pointer(f.dict.buf.rear)
+		if i < f.n-2 {
+			f.ht[i].put(h, p)
+		} else {
+			f.hc.put(h, p)
+		}
+	}
+}
+
+func (f *hcFinder) Skip(n int) {
+	if n < 0 {
+		panic("lzma: can't skip negative number of bytes")
+	}
+	if n > f.dict.Buffered() {
+		panic(errors.New("lzma: skip request exceeds buffered size"))
+	}
+	if n <= f.ahead {
+		f.mustDiscard(n)
+		f.ahead -= n
+		return
+	}
+	n -= f.ahead
+	f.mustDiscard(f.ahead)
+	f.ahead = 0
+	for ; n > 0; n-- {
+		k, _ := f.dict.Peek(f.data[:f.n])
+		f.hash.Compute(f.data[:k])
+		f.enterHashes()
+		f.mustDiscard(1)
+	}
+}
+
+func (f *hcFinder) betterMatch(p ptr, maxLen int) (m match, ok bool) {
+	if len(f.data) < maxLen+1 {
+		panic("called with len(f.data) < maxLen+1")
+	}
+	buf := &f.dict.buf
+	dist := buf.rear - p.index()
+	if dist < 0 {
+		dist += len(buf.data)
+	}
+	if dist > f.dict.Len() {
+		return m, false
+	}
+	if f.dict.byteAt(dist-maxLen) != f.data[maxLen] {
+		return m, false
+	}
+	n := buf.matchLen(dist, f.data)
+	if n < maxLen {
+		return m, false
+	}
+	return match{int64(dist), n}, true
+}
+
+func (f *hcFinder) onlyfindMatches(m []match) int {
+	if len(m) == 0 {
+		return 0
+	}
+	if len(f.data) == 0 {
+		panic("no data")
+	}
+	var n, maxLen int
+	hi := len(f.hash) - 1
+	if hi+2 == f.n {
+		// search hash chain
+		k := f.hc.get(f.hash[hi], f.ptrs)
+		hi--
+		for _, p := range f.ptrs[:k] {
+			bm, ok := f.betterMatch(p, maxLen)
+			if !ok {
+				continue
+			}
+			maxLen = bm.n
+			m[n] = bm
+			n++
+			if n == len(m) || len(f.data) == maxLen {
+				return n
+			}
+		}
+	}
+	for ; hi >= 0; hi-- {
+		// search the hash tables for the smaller hash lengths
+		ht := f.ht[hi]
+		p, ok := ht.get(f.hash[hi])
+		if !ok {
+			continue
+		}
+		bm, ok := f.betterMatch(p, maxLen)
+		if !ok {
+			continue
+		}
+		maxLen = bm.n
+		m[n] = bm
+		n++
+		if n == len(m) || len(f.data) == maxLen {
+			return n
+		}
+	}
+	return n
+}
+
+func (f *hcFinder) FindMatches(m []match) int {
+	if f.dict.Buffered() == 0 {
+		panic(errors.New("lzma: no data buffered"))
+	}
+	if f.ahead > 0 {
+		panic(errors.New("lzma: call Skip before FindMatches"))
+	}
+	k, _ := f.dict.Peek(f.data[:f.niceLen])
+	f.data = f.data[:k]
+	if f.n < k {
+		k = f.n
+	}
+	f.hash.Compute(f.data[:k])
+	n := f.onlyfindMatches(m)
+	f.enterHashes()
+	f.ahead++
+	return n
 }

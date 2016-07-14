@@ -1,6 +1,9 @@
 package lzma
 
-import "testing"
+import (
+	"io"
+	"testing"
+)
 
 func TestHTable(t *testing.T) {
 	var ht htable
@@ -39,4 +42,64 @@ func TestHChain(t *testing.T) {
 			t.Fatalf("p.index() is %d; want 0 or 1", p.index())
 		}
 	}
+}
+
+const example = `LZMA decoder test example
+=========================
+! LZMA ! Decoder ! TEST !
+=========================
+! TEST ! LZMA ! Decoder !
+=========================
+---- Test Line 1 --------
+=========================
+---- Test Line 2 --------
+=========================
+=== End of test file ====
+=========================
+`
+
+func TestHCFinder(t *testing.T) {
+	const depth = 20
+	f, err := newHCFinder(4, 4096, 4096, 200, depth)
+	if err != nil {
+		t.Fatalf("newHCFinder error %s", err)
+	}
+	dict := f.Dict()
+	n, err := io.WriteString(dict, example)
+	if err != nil {
+		t.Fatalf("io.WriteString(dict, example) error %s", err)
+	}
+	if n != len(example) {
+		t.Fatalf("io.WriteString(dict, example) returned %d; want %d",
+			n, len(example))
+	}
+	matches := make([]match, depth)
+	t.Log("# Example")
+	t.Log(example)
+	for dict.Buffered() > 0 {
+		pos := dict.pos()
+		end := pos + 10
+		if end > int64(len(example)) {
+			end = int64(len(example))
+		}
+		t.Logf("pos %d %q...\n", pos, example[pos:end])
+		n := f.FindMatches(matches)
+		if n == 0 {
+			t.Log("no matches")
+		}
+		for i, m := range matches[:n] {
+			t.Logf("matches[%d] = %v -> %q", i, m,
+				example[pos:pos+int64(m.n)])
+		}
+		if n == 0 {
+			f.Skip(1)
+			continue
+		}
+		best := matches[n-1]
+		f.Skip(best.n)
+	}
+	for i, ht := range f.ht {
+		t.Logf("len(f.ht[%d].table) %d", i, len(ht.table))
+	}
+	t.Logf("len(f.hc.table) %d", len(f.hc.table))
 }
