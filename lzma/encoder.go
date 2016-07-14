@@ -218,6 +218,7 @@ func (e *encoder) writeMatch(distance int64, n int) error {
 	return e.state.repLenCodec.Encode(e.re, nu, posState)
 }
 
+// writeEOS writes an EOS marker out
 func (e *encoder) writeEOS() error {
 	return e.writeMatch(eosDistance, minMatchLen)
 }
