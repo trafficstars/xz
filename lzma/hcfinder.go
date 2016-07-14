@@ -346,7 +346,8 @@ func (f *hcFinder) mustDiscard(n int) {
 		panic(err)
 	}
 	if discarded != n {
-		panic(fmt.Errorf("Discard returned %d; want %d", discarded, n))
+		panic(fmt.Errorf("method Discard returned %d; want %d",
+			discarded, n))
 	}
 }
 
