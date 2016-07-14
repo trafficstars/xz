@@ -6,37 +6,17 @@
 
     - make depth and niceLen an argument of MatchFinder.new 
 
-    - implement FindMatches for both methods
-
-    - adapt encoder to use FindMatches
-
-    - implement hash chain with multiple word length
-
-         word length  comment
-        ------------- ----------
-                   2  only 2
-                   3  2 and 3
-                   4  2, 3 and 4
+    - improve hash chain by using single list and compute distances
 
     - implement bt2-bt4 as well
 
-2. Move xb to `internal/_cmd` to prevent building with go install ./...
-   in the xz package directory.
-
-3. Compare compression ratio with xz tool using comparable parameters
+2. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
 
-4. Do some optimizations
+3. Do some optimizations
     - rename operation action and make it a simple type of size 8
 
-5. Change API again
-
-```Go
-   func NewReaderCfg(xz io.Reader, cfg ReaderConfig) (r *Reader, err error)
-   func NewWriterCfg(xz io.Writer, cfg WriterConfig) (w *Writer, err error)
-```
-
-6. Add thanks to README.md and list all developers that have reported
+4. Add thanks to README.md and list all developers that have reported
    problems with the library.
 
 ## Release v0.7
@@ -103,6 +83,13 @@
 - git push
 
 ## Log
+
+### 2016-07-14
+
+Changed the MatchFinder interface and created a new HashChain
+implementation. The code works again and the compression ration should
+have gone up. Compression speed decreases but I believe I can fix that
+again.
 
 ### 2016-07-04
 
