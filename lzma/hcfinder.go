@@ -293,11 +293,10 @@ type hcFinder struct {
 	// table of hash entries
 	hc *hchain
 	// word length for the hasd chain
-	n       int
-	niceLen int
-	// preallocated array; len(ptrs) == depth
+	n int
+	// preallocated array; capacity is depth
 	ptrs []ptr
-	// preallocated data having word lenght
+	// preallocated data having the capacity of niceLen
 	data []byte
 }
 
@@ -319,14 +318,13 @@ func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 		return nil, err
 	}
 	f := &hcFinder{
-		n:       n,
-		niceLen: niceLen,
-		dict:    dict,
-		hash:    buz.MakeHash(n),
-		ht:      make([]htable, n-2),
-		hc:      newHChain(dict.buf.Cap(), 1<<18),
-		ptrs:    make([]ptr, depth),
-		data:    make([]byte, niceLen),
+		n:    n,
+		dict: dict,
+		hash: buz.MakeHash(n),
+		ht:   make([]htable, n-2),
+		hc:   newHChain(dict.buf.Cap()+1, 1<<18),
+		ptrs: make([]ptr, depth),
+		data: make([]byte, niceLen),
 	}
 	for i := range f.ht {
 		f.ht[i].resize(1 << (10 + 2*uint(i)))
@@ -336,6 +334,10 @@ func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 
 func (f *hcFinder) Dict() *dict {
 	return f.dict
+}
+
+func (f *hcFinder) Depth() int {
+	return cap(f.ptrs)
 }
 
 func (f *hcFinder) mustDiscard(n int) {
@@ -391,14 +393,14 @@ func (f *hcFinder) betterMatch(p ptr, maxLen int) (m match, ok bool) {
 	if dist < 0 {
 		dist += len(buf.data)
 	}
-	if dist > f.dict.Len() {
+	if !(1 <= dist && dist <= f.dict.Len()) {
 		return m, false
 	}
-	if f.dict.byteAt(dist-maxLen) != f.data[maxLen] {
+	if f.dict.ByteAt(dist-maxLen) != f.data[maxLen] {
 		return m, false
 	}
 	n := buf.matchLen(dist, f.data)
-	if n < maxLen {
+	if !(2 <= n && n <= maxMatchLen) {
 		return m, false
 	}
 	return match{int64(dist), n}, true
@@ -455,10 +457,7 @@ func (f *hcFinder) FindMatches(m []match) int {
 	if f.dict.Buffered() == 0 {
 		panic(errors.New("lzma: no data buffered"))
 	}
-	if f.ahead > 0 {
-		panic(errors.New("lzma: call Skip before FindMatches"))
-	}
-	k, _ := f.dict.Peek(f.data[:f.niceLen])
+	k, _ := f.dict.Peek(f.data[:cap(f.data)])
 	f.data = f.data[:k]
 	if f.n < k {
 		k = f.n

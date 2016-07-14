@@ -61,12 +61,10 @@ func (a MatchFinder) verify() error {
 
 // new creates the matcher based on the matchfinder value.
 func (a MatchFinder) new(dictCap int) (m matcher, err error) {
+	/* TODO: make this a WriterConfig and Writer2Config operation */
 	switch a {
 	case HashTable4:
-		return newHashTable(dictCap, 4)
-	case BinaryTree:
-		return newBinTree(dictCap)
-		// TODO
+		return newHCFinder(4, dictCap, 4096, 200, 20)
 	}
 	return nil, errUnsupportedMatchFinder
 }

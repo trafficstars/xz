@@ -113,11 +113,7 @@ func NewWriter2Cfg(lzma2 io.Writer, cfg Writer2Config) (w *Writer2, err error) {
 	if err != nil {
 		return nil, err
 	}
-	d, err := newEncoderDict(cfg.DictCap, cfg.BufSize, m)
-	if err != nil {
-		return nil, err
-	}
-	w.encoder, err = newEncoder(&w.lbw, cloneState(w.start), d, 0)
+	w.encoder, err = newEncoder(&w.lbw, cloneState(w.start), m, 0)
 	if err != nil {
 		return nil, err
 	}

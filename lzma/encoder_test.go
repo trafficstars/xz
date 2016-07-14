@@ -35,11 +35,7 @@ func cycle(t *testing.T, n int) {
 			len(testString))
 	}
 	const dictCap = MinDictCap
-	m, err := newHashTable(dictCap, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encoderDict, err := newEncoderDict(dictCap, dictCap+1024, m)
+	m, err := HashTable4.new(dictCap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +45,7 @@ func cycle(t *testing.T, n int) {
 	}
 	state := newState(props)
 	var buf bytes.Buffer
-	w, err := newEncoder(&buf, state, encoderDict, eosMarker)
+	w, err := newEncoder(&buf, state, m, eosMarker)
 	if err != nil {
 		t.Fatalf("newEncoder error %s", err)
 	}
@@ -100,11 +96,7 @@ func TestEncoderCycle2(t *testing.T) {
 	txt := buf.String()
 	buf.Reset()
 	const dictCap = MinDictCap
-	m, err := newHashTable(dictCap, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encoderDict, err := newEncoderDict(dictCap, dictCap+1024, m)
+	m, err := HashTable4.new(dictCap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +106,7 @@ func TestEncoderCycle2(t *testing.T) {
 	}
 	state := newState(props)
 	lbw := &LimitedByteWriter{BW: buf, N: 100}
-	w, err := newEncoder(lbw, state, encoderDict, 0)
+	w, err := newEncoder(lbw, state, m, 0)
 	if err != nil {
 		t.Fatalf("NewEncoder error %s", err)
 	}

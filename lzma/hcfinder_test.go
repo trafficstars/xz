@@ -77,7 +77,7 @@ func TestHCFinder(t *testing.T) {
 	t.Log("# Example")
 	t.Log(example)
 	for dict.Buffered() > 0 {
-		pos := dict.pos()
+		pos := dict.Pos()
 		end := pos + 10
 		if end > int64(len(example)) {
 			end = int64(len(example))

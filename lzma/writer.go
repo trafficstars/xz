@@ -136,15 +136,11 @@ func NewWriterCfg(lzma io.Writer, cfg WriterConfig) (w *Writer, err error) {
 	if err != nil {
 		return nil, err
 	}
-	dict, err := newEncoderDict(w.h.dictCap, cfg.BufSize, m)
-	if err != nil {
-		return nil, err
-	}
 	var flags encoderFlags
 	if cfg.EOSMarker {
 		flags = eosMarker
 	}
-	if w.e, err = newEncoder(w.bw, state, dict, flags); err != nil {
+	if w.e, err = newEncoder(w.bw, state, m, flags); err != nil {
 		return nil, err
 	}
 

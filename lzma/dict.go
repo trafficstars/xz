@@ -75,10 +75,16 @@ func (d *dict) Write(p []byte) (n int, err error) {
 }
 
 // Pos returns the position of the head.
-func (d *dict) pos() int64 { return d.head }
+func (d *dict) Pos() int64 { return d.head }
+
+// Returns the byte as the head. It makes no checks, whether there is
+// actually buffered data.
+func (d *dict) HeadByte() byte {
+	return d.buf.data[d.buf.rear]
+}
 
 // ByteAt returns the byte at the given distance.
-func (d *dict) byteAt(distance int) byte {
+func (d *dict) ByteAt(distance int) byte {
 	if !(0 < distance && distance <= d.Len()) {
 		return 0
 	}
@@ -92,7 +98,7 @@ func (d *dict) byteAt(distance int) byte {
 // CopyN copies the last n bytes from the dictionary into the provided
 // writer. This is used for copying uncompressed data into an
 // uncompressed segment.
-func (d *dict) copyN(w io.Writer, n int) (written int, err error) {
+func (d *dict) CopyN(w io.Writer, n int) (written int, err error) {
 	if n <= 0 {
 		return 0, nil
 	}
