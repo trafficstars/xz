@@ -20,7 +20,10 @@ const (
 	litTag
 )
 
-// operation represents an operation in the encoded data stream.
+// operation represents an operation in the encoded data stream. Since
+// we are using an uint32 for the distance and don't subtract 1, we
+// cannot express an EOS Marker with operation. The decoder returns an
+// error and the encoder doesn't use operation to write the EOS marker.
 type operation struct {
 	distance uint32
 	len      uint16
@@ -28,8 +31,11 @@ type operation struct {
 	c        byte
 }
 
+// nop is no operation
 var nop = operation{}
 
+// verify checks whether the operation is valid. A nop is not a valid
+// operation.
 func (op operation) verify() error {
 	switch op.tag {
 	case matchTag:
@@ -48,6 +54,7 @@ func (op operation) verify() error {
 	return nil
 }
 
+// Strings prints a readable representation of an operation.
 func (op operation) String() string {
 	switch op.tag {
 	case matchTag:
@@ -65,10 +72,12 @@ func (op operation) String() string {
 	}
 }
 
+// match creates a match operation.
 func match(distance uint32, n int) operation {
 	return operation{tag: matchTag, distance: distance, len: uint16(n)}
 }
 
+// lit creates a literal operation.
 func lit(c byte) operation {
 	return operation{tag: litTag, len: 1, c: c}
 }
