@@ -28,8 +28,8 @@ type WriterConfig struct {
 	// Size of the lookahead buffer; value 0 indicates default size
 	// 4096
 	BufSize int
-	// Match finder
-	Matcher MatchFinder
+	// Match finder algorithm
+	MatchFinder MatchFinder
 	// SizeInHeader indicates that the header will contain an
 	// explicit size.
 	SizeInHeader bool
@@ -59,11 +59,12 @@ func (c *WriterConfig) fill() {
 	if !c.SizeInHeader {
 		c.EOSMarker = true
 	}
+	// TODO: set proper MatchFinder
 }
 
-// Verify checks WriterConfig for errors. Verify will replace zero
+// verify checks WriterConfig for errors. Verify will replace zero
 // values with default values.
-func (c *WriterConfig) Verify() error {
+func (c *WriterConfig) verify() error {
 	c.fill()
 	var err error
 	if c == nil {
@@ -88,7 +89,7 @@ func (c *WriterConfig) Verify() error {
 	} else if !c.EOSMarker {
 		return errors.New("lzma: EOS marker is required")
 	}
-	if err = c.Matcher.verify(); err != nil {
+	if err = c.MatchFinder.verify(); err != nil {
 		return err
 	}
 
@@ -116,13 +117,13 @@ type Writer struct {
 	e   *encoder
 }
 
-// NewWriter creates a new LZMA writer for the classic format. The
+// NewWriterCfg creates a new LZMA writer for the classic format. The
 // method will write the header to the underlying stream.
-func (c WriterConfig) NewWriter(lzma io.Writer) (w *Writer, err error) {
-	if err = c.Verify(); err != nil {
+func NewWriterCfg(lzma io.Writer, cfg WriterConfig) (w *Writer, err error) {
+	if err = cfg.verify(); err != nil {
 		return nil, err
 	}
-	w = &Writer{h: c.header()}
+	w = &Writer{h: cfg.header()}
 
 	var ok bool
 	w.bw, ok = lzma.(io.ByteWriter)
@@ -131,19 +132,15 @@ func (c WriterConfig) NewWriter(lzma io.Writer) (w *Writer, err error) {
 		w.bw = w.buf
 	}
 	state := newState(w.h.properties)
-	m, err := c.Matcher.new(w.h.dictCap)
-	if err != nil {
-		return nil, err
-	}
-	dict, err := newEncoderDict(w.h.dictCap, c.BufSize, m)
+	m, err := cfg.MatchFinder.new(w.h.dictCap)
 	if err != nil {
 		return nil, err
 	}
 	var flags encoderFlags
-	if c.EOSMarker {
+	if cfg.EOSMarker {
 		flags = eosMarker
 	}
-	if w.e, err = newEncoder(w.bw, state, dict, flags); err != nil {
+	if w.e, err = newEncoder(w.bw, state, m, flags); err != nil {
 		return nil, err
 	}
 
@@ -156,7 +153,7 @@ func (c WriterConfig) NewWriter(lzma io.Writer) (w *Writer, err error) {
 // NewWriter creates a new LZMA writer using the classic format. The
 // function writes the header to the underlying stream.
 func NewWriter(lzma io.Writer) (w *Writer, err error) {
-	return WriterConfig{}.NewWriter(lzma)
+	return NewWriterCfg(lzma, WriterConfig{})
 }
 
 // writeHeader writes the LZMA header into the stream.

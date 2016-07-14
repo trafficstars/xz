@@ -71,7 +71,7 @@ func TestWriterLongData(t *testing.T) {
 		t.Fatalf("ReadAll read %d bytes; want %d", len(txt), size)
 	}
 	buf := &bytes.Buffer{}
-	w, err := WriterConfig{DictCap: 0x4000}.NewWriter(buf)
+	w, err := NewWriterCfg(buf, WriterConfig{DictCap: 0x4000})
 	if err != nil {
 		t.Fatalf("WriterConfig.NewWriter error %s", err)
 	}
@@ -105,7 +105,7 @@ func TestWriterLongData(t *testing.T) {
 
 func TestWriter_Size(t *testing.T) {
 	buf := new(bytes.Buffer)
-	w, err := WriterConfig{Size: 10, EOSMarker: true}.NewWriter(buf)
+	w, err := NewWriterCfg(buf, WriterConfig{Size: 10, EOSMarker: true})
 	if err != nil {
 		t.Fatalf("WriterConfig.NewWriter error %s", err)
 	}
@@ -193,7 +193,7 @@ func BenchmarkReader(b *testing.B) {
 		b.Fatalf("ReadAll error %s", err)
 	}
 	buf := &bytes.Buffer{}
-	w, err := WriterConfig{DictCap: 0x4000}.NewWriter(buf)
+	w, err := NewWriterCfg(buf, WriterConfig{DictCap: 0x4000})
 	if err != nil {
 		b.Fatalf("WriterConfig{}.NewWriter error %s", err)
 	}
@@ -235,7 +235,7 @@ func BenchmarkWriter(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		w, err := WriterConfig{DictCap: 0x4000}.NewWriter(buf)
+		w, err := NewWriterCfg(buf, WriterConfig{DictCap: 0x4000})
 		if err != nil {
 			b.Fatalf("NewWriter error %s", err)
 		}

@@ -32,10 +32,19 @@ const (
 	eosMarker encoderFlags = 1 << iota
 )
 
+// matcher provides the capability to find matches in the repository.
+type matcher interface {
+	Dict() *dict
+	FindMatches(m []match) int
+	Skip(n int)
+	Depth() int
+}
+
 // Encoder compresses data buffered in the encoder dictionary and writes
 // it into a byte writer.
 type encoder struct {
-	dict  *encoderDict
+	mf    matcher
+	dict  *dict
 	state *state
 	re    *rangeEncoder
 	start int64
@@ -43,26 +52,33 @@ type encoder struct {
 	marker bool
 	limit  bool
 	margin int
+	// preallocated array; with capacity depth
+	matches []match
+	// preallocated array of maxMatchLen size
+	data []byte
 }
 
 // newEncoder creates a new encoder. If the byte writer must be
 // limited use LimitedByteWriter provided by this package. The flags
 // argument supports the eosMarker flag, controlling whether a
 // terminating end-of-stream marker must be written.
-func newEncoder(bw io.ByteWriter, state *state, dict *encoderDict,
-	flags encoderFlags) (e *encoder, err error) {
-
+func newEncoder(bw io.ByteWriter, state *state, mf matcher, flags encoderFlags,
+) (e *encoder, err error) {
 	re, err := newRangeEncoder(bw)
 	if err != nil {
 		return nil, err
 	}
+	dict := mf.Dict()
 	e = &encoder{
-		dict:   dict,
-		state:  state,
-		re:     re,
-		marker: flags&eosMarker != 0,
-		start:  dict.Pos(),
-		margin: opLenMargin,
+		mf:      mf,
+		dict:    dict,
+		state:   state,
+		re:      re,
+		marker:  flags&eosMarker != 0,
+		start:   dict.Pos(),
+		margin:  opLenMargin,
+		matches: make([]match, mf.Depth()),
+		data:    make([]byte, maxMatchLen),
 	}
 	if e.marker {
 		e.margin += 5
@@ -219,6 +235,24 @@ func (e *encoder) writeOp(op operation) error {
 	}
 }
 
+// NextOp identifies the next operation to be written.
+func (e *encoder) NextOp() operation {
+	n := e.mf.FindMatches(e.matches[:cap(e.matches)])
+	if n == 0 {
+		return lit{e.dict.HeadByte()}
+	}
+	best := e.matches[n-1]
+	k, _ := e.dict.buf.Peek(e.data[:cap(e.data)])
+	if k == best.n {
+		return best
+	}
+	k = e.dict.buf.matchLen(int(best.distance), e.data[:k])
+	if k > best.n {
+		best.n = k
+	}
+	return best
+}
+
 // compress compressed data from the dictionary buffer. If the flag all
 // is set, all data in the dictionary buffer will be compressed. The
 // function returns ErrLimit if the underlying writer has reached its
@@ -228,14 +262,12 @@ func (e *encoder) compress(flags compressFlags) error {
 	if flags&all == 0 {
 		n = maxMatchLen - 1
 	}
-	d := e.dict
-	m := d.m
-	for d.Buffered() > n {
-		op := m.NextOp(e.state.rep)
+	for e.dict.Buffered() > n {
+		op := e.NextOp()
 		if err := e.writeOp(op); err != nil {
 			return err
 		}
-		d.Discard(op.Len())
+		e.mf.Skip(op.Len())
 	}
 	return nil
 }

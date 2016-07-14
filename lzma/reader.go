@@ -30,7 +30,7 @@ func (c *ReaderConfig) fill() {
 
 // Verify checks the reader configuration for errors. Zero values will
 // be replaced by default values.
-func (c *ReaderConfig) Verify() error {
+func (c *ReaderConfig) verify() error {
 	c.fill()
 	if !(MinDictCap <= c.DictCap && c.DictCap <= MaxDictCap) {
 		return errors.New("lzma: dictionary capacity is out of range")
@@ -48,14 +48,14 @@ type Reader struct {
 // NewReader creates a new reader for an LZMA stream using the classic
 // format. NewReader reads and checks the header of the LZMA stream.
 func NewReader(lzma io.Reader) (r *Reader, err error) {
-	return ReaderConfig{}.NewReader(lzma)
+	return NewReaderCfg(lzma, ReaderConfig{})
 }
 
-// NewReader creates a new reader for an LZMA stream in the classic
+// NewReaderCfg creates a new reader for an LZMA stream in the classic
 // format. The function reads and verifies the the header of the LZMA
 // stream.
-func (c ReaderConfig) NewReader(lzma io.Reader) (r *Reader, err error) {
-	if err = c.Verify(); err != nil {
+func NewReaderCfg(lzma io.Reader, cfg ReaderConfig) (r *Reader, err error) {
+	if err = cfg.verify(); err != nil {
 		return nil, err
 	}
 	data := make([]byte, HeaderLen)
@@ -73,8 +73,8 @@ func (c ReaderConfig) NewReader(lzma io.Reader) (r *Reader, err error) {
 		return nil, errors.New("lzma: dictionary capacity too small")
 	}
 	dictCap := r.h.dictCap
-	if c.DictCap > dictCap {
-		dictCap = c.DictCap
+	if cfg.DictCap > dictCap {
+		dictCap = cfg.DictCap
 	}
 
 	state := newState(r.h.properties)

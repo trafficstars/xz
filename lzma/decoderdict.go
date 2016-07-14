@@ -78,7 +78,7 @@ func (d *decoderDict) byteAt(dist int) byte {
 // first.
 func (d *decoderDict) writeMatch(dist int64, length int) error {
 	if !(0 < dist && dist <= int64(d.dictLen())) {
-		return errors.New("writeMatch: distance out of range")
+		return fmt.Errorf("writeMatch: distance %d out of range", dist)
 	}
 	if !(0 < length && length <= maxMatchLen) {
 		return errors.New("writeMatch: length out of range")
@@ -129,7 +129,7 @@ func (d *decoderDict) Read(p []byte) (n int, err error) { return d.buf.Read(p) }
 
 // Buffered returns the number of bytes currently buffered in the
 // decoder dictionary.
-func (d *decoderDict) buffered() int { return d.buf.Buffered() }
+func (d *decoderDict) Buffered() int { return d.buf.Buffered() }
 
 // Peek gets data from the buffer without advancing the rear index.
-func (d *decoderDict) peek(p []byte) (n int, err error) { return d.buf.Peek(p) }
+func (d *decoderDict) Peek(p []byte) (n int, err error) { return d.buf.Peek(p) }
