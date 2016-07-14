@@ -23,6 +23,8 @@ type Writer2Config struct {
 	BufSize int
 	// Match finder algorithm
 	MatchFinder MatchFinder
+	NiceLen     int
+	Depth       int
 }
 
 // fill replaces zero values with default values.
@@ -36,7 +38,12 @@ func (c *Writer2Config) fill() {
 	if c.BufSize == 0 {
 		c.BufSize = 4096
 	}
-	// TODO: set proper match finder
+	if c.MatchFinder == 0 {
+		c.MatchFinder = HashChain4
+	}
+	if c.NiceLen == 0 {
+		c.NiceLen = 64
+	}
 }
 
 // verify checks the Writer2Config for correctness. Zero values will be
@@ -64,6 +71,12 @@ func (c *Writer2Config) verify() error {
 	}
 	if err = c.MatchFinder.verify(); err != nil {
 		return err
+	}
+	if !(4 <= c.NiceLen && c.NiceLen <= maxMatchLen) {
+		return errors.New("lzma: NiceLen out of range")
+	}
+	if c.Depth < 0 {
+		return errors.New("lzma: Depth is negative")
 	}
 	return nil
 }
@@ -109,7 +122,8 @@ func NewWriter2Cfg(lzma2 io.Writer, cfg Writer2Config) (w *Writer2, err error) {
 	}
 	w.buf.Grow(maxCompressed)
 	w.lbw = LimitedByteWriter{BW: &w.buf, N: maxCompressed}
-	m, err := cfg.MatchFinder.new(cfg.DictCap)
+	m, err := cfg.MatchFinder.new(cfg.DictCap, cfg.BufSize, cfg.NiceLen,
+		cfg.Depth)
 	if err != nil {
 		return nil, err
 	}

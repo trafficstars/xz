@@ -22,6 +22,8 @@ type WriterConfig struct {
 	CheckSum byte
 	// match finder algorithm
 	MatchFinder lzma.MatchFinder
+	NiceLen     int
+	Depth       int
 }
 
 // fill replaces zero values with default values.
@@ -40,6 +42,9 @@ func (c *WriterConfig) fill() {
 	}
 	if c.CheckSum == 0 {
 		c.CheckSum = CRC64
+	}
+	if c.NiceLen == 0 {
+		c.NiceLen = 64
 	}
 }
 

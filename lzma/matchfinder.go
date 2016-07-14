@@ -52,15 +52,16 @@ func (a MatchFinder) verify() error {
 }
 
 // new creates the matcher based on the matchfinder value.
-func (a MatchFinder) new(dictCap int) (m matcher, err error) {
-	/* TODO: make this a WriterConfig and Writer2Config operation */
+func (a MatchFinder) new(dictCap, bufSize, niceLen, depth int) (m matcher, err error) {
+	depth = 4 + niceLen/4
+	// TODO: other depth value for binary tree
 	switch a {
 	case 0, HashChain4:
-		return newHCFinder(4, dictCap, 4096, 200, 20)
+		return newHCFinder(4, dictCap, bufSize, niceLen, depth)
 	case HashChain3:
-		return newHCFinder(3, dictCap, 4096, 200, 20)
+		return newHCFinder(3, dictCap, bufSize, niceLen, depth)
 	case HashChain2:
-		return newHCFinder(2, dictCap, 4096, 200, 20)
+		return newHCFinder(2, dictCap, bufSize, niceLen, depth)
 	}
 	return nil, errUnsupportedMatchFinder
 }

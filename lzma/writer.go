@@ -40,6 +40,8 @@ type WriterConfig struct {
 	// If no explicit size is been given the EOSMarker will be
 	// set automatically.
 	EOSMarker bool
+	NiceLen   int
+	Depth     int
 }
 
 // fill converts zero-value fields to their explicit default values.
@@ -59,7 +61,12 @@ func (c *WriterConfig) fill() {
 	if !c.SizeInHeader {
 		c.EOSMarker = true
 	}
-	// TODO: set proper MatchFinder
+	if c.MatchFinder == 0 {
+		c.MatchFinder = HashChain4
+	}
+	if c.NiceLen == 0 {
+		c.NiceLen = 64
+	}
 }
 
 // verify checks WriterConfig for errors. Verify will replace zero
@@ -92,7 +99,12 @@ func (c *WriterConfig) verify() error {
 	if err = c.MatchFinder.verify(); err != nil {
 		return err
 	}
-
+	if !(4 <= c.NiceLen && c.NiceLen <= maxMatchLen) {
+		return errors.New("lzma: NiceLen out of range")
+	}
+	if c.Depth < 0 {
+		return errors.New("lzma: Depth is negative")
+	}
 	return nil
 }
 
@@ -132,7 +144,8 @@ func NewWriterCfg(lzma io.Writer, cfg WriterConfig) (w *Writer, err error) {
 		w.bw = w.buf
 	}
 	state := newState(w.h.properties)
-	m, err := cfg.MatchFinder.new(w.h.dictCap)
+	m, err := cfg.MatchFinder.new(w.h.dictCap, cfg.BufSize, cfg.NiceLen,
+		cfg.Depth)
 	if err != nil {
 		return nil, err
 	}
