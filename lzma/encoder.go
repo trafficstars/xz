@@ -35,7 +35,7 @@ const (
 // matcher provides the capability to find matches in the repository.
 type matcher interface {
 	Dict() *dict
-	FindMatches(m []match) int
+	FindMatches(m []operation) int
 	Skip(n int)
 	Depth() int
 }
@@ -53,7 +53,7 @@ type encoder struct {
 	limit  bool
 	margin int
 	// preallocated array; with capacity depth
-	matches []match
+	matches []operation
 	// preallocated array of maxMatchLen size
 	data []byte
 }
@@ -77,7 +77,7 @@ func newEncoder(bw io.ByteWriter, state *state, mf matcher, flags encoderFlags,
 		marker:  flags&eosMarker != 0,
 		start:   dict.Pos(),
 		margin:  opLenMargin,
-		matches: make([]match, mf.Depth()),
+		matches: make([]operation, mf.Depth()),
 		data:    make([]byte, maxMatchLen),
 	}
 	if e.marker {
@@ -116,7 +116,7 @@ func (e *encoder) Reopen(bw io.ByteWriter) error {
 }
 
 // writeLiteral writes a literal into the LZMA stream
-func (e *encoder) writeLiteral(l lit) error {
+func (e *encoder) writeLiteral(c byte) error {
 	var err error
 	state, state2, _ := e.state.states(e.dict.Pos())
 	if err = e.state.isMatch[state2].Encode(e.re, 0); err != nil {
@@ -124,7 +124,7 @@ func (e *encoder) writeLiteral(l lit) error {
 	}
 	litState := e.state.litState(e.dict.ByteAt(1), e.dict.Pos())
 	match := e.dict.ByteAt(int(e.state.rep[0]) + 1)
-	err = e.state.litCodec.Encode(e.re, l.b, state, match, litState)
+	err = e.state.litCodec.Encode(e.re, c, state, match, litState)
 	if err != nil {
 		return err
 	}
@@ -142,17 +142,17 @@ func iverson(ok bool) uint32 {
 }
 
 // writeMatch writes a repetition operation into the operation stream
-func (e *encoder) writeMatch(m match) error {
+func (e *encoder) writeMatch(distance int64, n int) error {
 	var err error
-	if !(minDistance <= m.distance && m.distance <= maxDistance) {
-		panic(fmt.Errorf("match distance %d out of range", m.distance))
+	if !(minDistance <= distance && distance <= eosDistance) {
+		panic(fmt.Errorf("match distance %d out of range", distance))
 	}
-	dist := uint32(m.distance - minDistance)
-	if !(minMatchLen <= m.n && m.n <= maxMatchLen) &&
-		!(dist == e.state.rep[0] && m.n == 1) {
+	dist := uint32(distance - minDistance)
+	if !(minMatchLen <= n && n <= maxMatchLen) &&
+		!(dist == e.state.rep[0] && n == 1) {
 		panic(fmt.Errorf(
 			"match length %d out of range; dist %d rep[0] %d",
-			m.n, dist, e.state.rep[0]))
+			n, dist, e.state.rep[0]))
 	}
 	state, state2, posState := e.state.states(e.dict.Pos())
 	if err = e.state.isMatch[state2].Encode(e.re, 1); err != nil {
@@ -168,16 +168,16 @@ func (e *encoder) writeMatch(m match) error {
 	if err = e.state.isRep[state].Encode(e.re, b); err != nil {
 		return err
 	}
-	n := uint32(m.n - minMatchLen)
+	nu := uint32(n - minMatchLen)
 	if b == 0 {
 		// simple match
 		e.state.rep[3], e.state.rep[2], e.state.rep[1], e.state.rep[0] =
 			e.state.rep[2], e.state.rep[1], e.state.rep[0], dist
 		e.state.updateStateMatch()
-		if err = e.state.lenCodec.Encode(e.re, n, posState); err != nil {
+		if err = e.state.lenCodec.Encode(e.re, nu, posState); err != nil {
 			return err
 		}
-		return e.state.distCodec.Encode(e.re, dist, n)
+		return e.state.distCodec.Encode(e.re, dist, nu)
 	}
 	b = iverson(g != 0)
 	if err = e.state.isRepG0[state].Encode(e.re, b); err != nil {
@@ -185,7 +185,7 @@ func (e *encoder) writeMatch(m match) error {
 	}
 	if b == 0 {
 		// g == 0
-		b = iverson(m.n != 1)
+		b = iverson(n != 1)
 		if err = e.state.isRepG0Long[state2].Encode(e.re, b); err != nil {
 			return err
 		}
@@ -215,7 +215,11 @@ func (e *encoder) writeMatch(m match) error {
 		e.state.rep[0] = dist
 	}
 	e.state.updateStateRep()
-	return e.state.repLenCodec.Encode(e.re, n, posState)
+	return e.state.repLenCodec.Encode(e.re, nu, posState)
+}
+
+func (e *encoder) writeEOS() error {
+	return e.writeMatch(eosDistance, minMatchLen)
 }
 
 // writeOp writes a single operation to the range encoder. The function
@@ -225,11 +229,11 @@ func (e *encoder) writeOp(op operation) error {
 	if e.re.Available() < int64(e.margin) {
 		return ErrLimit
 	}
-	switch x := op.(type) {
-	case lit:
-		return e.writeLiteral(x)
-	case match:
-		return e.writeMatch(x)
+	switch op.tag {
+	case litTag:
+		return e.writeLiteral(op.c)
+	case matchTag:
+		return e.writeMatch(int64(op.distance), int(op.len))
 	default:
 		panic("unexpected operation")
 	}
@@ -239,16 +243,16 @@ func (e *encoder) writeOp(op operation) error {
 func (e *encoder) NextOp() operation {
 	n := e.mf.FindMatches(e.matches[:cap(e.matches)])
 	if n == 0 {
-		return lit{e.dict.HeadByte()}
+		return lit(e.dict.HeadByte())
 	}
 	best := e.matches[n-1]
 	k, _ := e.dict.buf.Peek(e.data[:cap(e.data)])
-	if k == best.n {
+	if k == int(best.len) {
 		return best
 	}
 	k = e.dict.buf.matchLen(int(best.distance), e.data[:k])
-	if k > best.n {
-		best.n = k
+	if k > int(best.len) {
+		best.len = uint16(k)
 	}
 	return best
 }
@@ -267,13 +271,10 @@ func (e *encoder) compress(flags compressFlags) error {
 		if err := e.writeOp(op); err != nil {
 			return err
 		}
-		e.mf.Skip(op.Len())
+		e.mf.Skip(int(op.len))
 	}
 	return nil
 }
-
-// eosMatch is a pseudo operation that indicates the end of the stream.
-var eosMatch = match{distance: maxDistance, n: minMatchLen}
 
 // Close terminates the LZMA stream. If requested the end-of-stream
 // marker will be written. If the byte writer limit has been or will be
@@ -285,7 +286,7 @@ func (e *encoder) Close() error {
 		return err
 	}
 	if e.marker {
-		if err := e.writeMatch(eosMatch); err != nil {
+		if err := e.writeEOS(); err != nil {
 			return err
 		}
 	}

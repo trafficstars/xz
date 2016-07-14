@@ -73,7 +73,7 @@ func TestHCFinder(t *testing.T) {
 		t.Fatalf("io.WriteString(dict, example) returned %d; want %d",
 			n, len(example))
 	}
-	matches := make([]match, depth)
+	matches := make([]operation, depth)
 	t.Log("# Example")
 	t.Log(example)
 	for dict.Buffered() > 0 {
@@ -89,14 +89,14 @@ func TestHCFinder(t *testing.T) {
 		}
 		for i, m := range matches[:n] {
 			t.Logf("matches[%d] = %v -> %q", i, m,
-				example[pos:pos+int64(m.n)])
+				example[pos:pos+int64(m.len)])
 		}
 		if n == 0 {
 			f.Skip(1)
 			continue
 		}
 		best := matches[n-1]
-		f.Skip(best.n)
+		f.Skip(int(best.len))
 	}
 	for i, ht := range f.ht {
 		t.Logf("len(f.ht[%d].table) %d", i, len(ht.table))

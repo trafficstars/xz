@@ -8,8 +8,10 @@ package lzma
 const (
 	// minimum supported distance
 	minDistance = 1
-	// maximum supported distance, value is used for the eos marker.
-	maxDistance = 1 << 32
+	// maximum supported distance for a real match
+	maxDistance = 1<<32 - 1
+	// end of stream marker uses a different distance
+	eosDistance = 1 << 32
 	// number of the supported len states
 	lenStates = 4
 	// start for the position models

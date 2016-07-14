@@ -385,7 +385,7 @@ func (f *hcFinder) Skip(n int) {
 	}
 }
 
-func (f *hcFinder) betterMatch(p ptr, maxLen int) (m match, ok bool) {
+func (f *hcFinder) betterMatch(p ptr, maxLen int) (m operation, ok bool) {
 	if len(f.data) < maxLen+1 {
 		panic("called with len(f.data) < maxLen+1")
 	}
@@ -404,10 +404,10 @@ func (f *hcFinder) betterMatch(p ptr, maxLen int) (m match, ok bool) {
 	if !(2 <= n && n <= maxMatchLen) {
 		return m, false
 	}
-	return match{int64(dist), n}, true
+	return match(uint32(dist), n), true
 }
 
-func (f *hcFinder) onlyfindMatches(m []match) int {
+func (f *hcFinder) onlyfindMatches(m []operation) int {
 	if len(m) == 0 {
 		return 0
 	}
@@ -425,7 +425,7 @@ func (f *hcFinder) onlyfindMatches(m []match) int {
 			if !ok {
 				continue
 			}
-			maxLen = bm.n
+			maxLen = int(bm.len)
 			m[n] = bm
 			n++
 			if n == len(m) || len(f.data) == maxLen {
@@ -444,7 +444,7 @@ func (f *hcFinder) onlyfindMatches(m []match) int {
 		if !ok {
 			continue
 		}
-		maxLen = bm.n
+		maxLen = int(bm.len)
 		m[n] = bm
 		n++
 		if n == len(m) || len(f.data) == maxLen {
@@ -454,7 +454,7 @@ func (f *hcFinder) onlyfindMatches(m []match) int {
 	return n
 }
 
-func (f *hcFinder) FindMatches(m []match) int {
+func (f *hcFinder) FindMatches(m []operation) int {
 	if f.dict.Buffered() == 0 {
 		panic(errors.New("lzma: no data buffered"))
 	}
