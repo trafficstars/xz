@@ -78,12 +78,16 @@ func (b *buffer) Read(p []byte) (n int, err error) {
 // requested.
 func (b *buffer) Peek(p []byte) (n int, err error) {
 	m := b.Buffered()
-	if m < len(p) {
-		p = p[:m]
+	n = len(p)
+	if m < n {
+		n = m
+		p = p[:n]
 	}
 	k := copy(p, b.data[b.rear:])
-	copy(p[k:], b.data)
-	return len(p), nil
+	if k < n {
+		copy(p[k:], b.data)
+	}
+	return n, nil
 }
 
 // Discard skips the next n bytes to read from the buffer, returning the
