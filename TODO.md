@@ -2,25 +2,29 @@
 
 ## Release v0.6
 
-1. Change matcher interface suppporting Depth and NiceLength
+1. Improve hash chain finder
 
-    - make depth and niceLen an argument of MatchFinder.new 
-
+    - use segment approach for match len computation
+        - cache match segment
+        - implement Bytes(n int) []byte method on segments for reading
+          head
     - improve hash chain by using single list and compute distances
+
+2. Implement binary tree finder
 
     - implement bt2-bt4 as well
 
-2. Support parameters in gxz tool.
+3. Support parameters in gxz tool.
 
    -> Support presets in the package.
 
-2. Compare compression ratio with xz tool using comparable parameters
+4. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
 
-3. Do some optimizations
+5. Do some optimizations
     - rename operation action and make it a simple type of size 8
 
-4. Add thanks to README.md and list all developers that have reported
+6. Add thanks to README.md and list all developers that have reported
    problems with the library.
 
 ## Release v0.7
