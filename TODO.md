@@ -4,10 +4,6 @@
 
 1. Improve hash chain finder
 
-    - use segment approach for match len computation
-        - cache match segment
-        - implement Bytes(n int) []byte method on segments for reading
-          head
     - improve hash chain by using single list and compute distances
 
 2. Implement binary tree finder
