@@ -85,15 +85,12 @@ func (d *dict) HeadByte() byte {
 
 // ByteAt returns the byte at the given distance.
 func (d *dict) ByteAt(distance int) byte {
-	if !(-d.Buffered() < distance && distance <= d.dictLen()) {
+	if !(0 < distance && distance <= d.Len()) {
 		return 0
 	}
 	i := d.buf.rear - distance
-	m := len(d.buf.data)
 	if i < 0 {
-		i += m
-	} else if i >= m {
-		i -= m
+		i += len(d.buf.data)
 	}
 	return d.buf.data[i]
 }
@@ -151,93 +148,4 @@ func (d *dict) Read(p []byte) (n int, err error) {
 	n, err = d.buf.Read(p)
 	d.head += int64(n)
 	return n, err
-}
-
-// prefixLen returns the length of the common prefix of a and b.
-func prefixLen(a, b []byte) int {
-	if len(a) > len(b) {
-		a, b = b, a
-	}
-	for i, c := range a {
-		if b[i] != c {
-			return i
-		}
-	}
-	return len(a)
-}
-
-// segment represents data as a sequence of two byte slices.
-type segment [2][]byte
-
-// Len returns the total length of the segment.
-func (s segment) Len() int {
-	return len(s[0]) + len(s[1])
-}
-
-// Peek reads data into p and returns the number of bytes copied. It
-// might return less data then requested, but never an error.
-func (s segment) Peek(p []byte) (n int, err error) {
-	n = copy(p, s[0])
-	n += copy(p[n:], s[1])
-	return n, nil
-}
-
-// prefixLenSegments returns the length of a common prefix of both
-// segments.
-func prefixLenSegments(a, b segment) int {
-	if len(a[0]) > len(b[0]) {
-		a, b = b, a
-	}
-	i := prefixLen(a[0], b[0])
-	if i < len(a[0]) {
-		return i
-	}
-	if i == len(b[0]) {
-		return i + prefixLen(a[1], b[1])
-	}
-	bb := b[0][i:]
-	j := prefixLen(a[1], bb)
-	if j < len(bb) {
-		return i + j
-	}
-	return i + j + prefixLen(a[1][j:], b[1])
-}
-
-// segment extracts the a segment starting at the given distance and
-// length n. The function might fail if the distance is out of range.
-// The segment might be shorter than the requested length.
-func (d *dict) segment(distance int, n int) (s segment, err error) {
-	b := &d.buf
-	u := b.Buffered()
-	if !(-u <= distance && distance <= d.dictLen()) {
-		return segment{}, errors.New(
-			"dict.segment: distance out of range")
-	}
-	if n < 0 {
-		return segment{}, errors.New(
-			"dict.segment: negative length")
-	}
-	maxN := distance + u
-	if n > maxN {
-		n = maxN
-	}
-	m := len(b.data)
-	i := b.rear - distance
-	j := i + n
-	if i < 0 {
-		if j < 0 {
-			s[0] = b.data[i+m : j+m]
-		} else {
-			s[0] = b.data[i+m:]
-			s[1] = b.data[:j]
-		}
-	} else {
-		if j < m {
-			s[0] = b.data[i : j]
-		} else {
-			s[0] = b.data[i:]
-			s[1] = b.data[:j-m]
-		}
-	}
-	return s, nil
 }
