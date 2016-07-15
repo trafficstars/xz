@@ -251,7 +251,7 @@ func (e *encoder) NextOp() operation {
 	if k == int(best.len) {
 		return best
 	}
-	k = e.dict.buf.matchLen(int(best.distance), e.data[:k])
+	k = e.dict.matchLen(int(best.distance), e.data[:k])
 	if k > int(best.len) {
 		best.len = uint16(k)
 	}

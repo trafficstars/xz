@@ -400,7 +400,7 @@ func (f *hcFinder) betterMatch(p ptr, maxLen int) (m operation, ok bool) {
 	if f.dict.ByteAt(dist-maxLen) != f.data[maxLen] {
 		return m, false
 	}
-	n := buf.matchLen(dist, f.data)
+	n := f.dict.matchLen(dist, f.data)
 	if !(2 <= n && n <= maxMatchLen) {
 		return m, false
 	}

@@ -149,3 +149,33 @@ func (d *dict) Read(p []byte) (n int, err error) {
 	d.head += int64(n)
 	return n, err
 }
+
+// prefixLen returns the length of the common prefix of a and b.
+func prefixLen(a, b []byte) int {
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	for i, c := range a {
+		if b[i] != c {
+			return i
+		}
+	}
+	return len(a)
+}
+
+// matchLen returns the length of the common prefix for the given
+// distance from the rear and the byte slice p.
+func (d *dict) matchLen(distance int, p []byte) int {
+	var n int
+	b := &d.buf
+	i := b.rear - distance
+	if i < 0 {
+		if n = prefixLen(p, b.data[len(b.data)+i:]); n < -i {
+			return n
+		}
+		p = p[n:]
+		i = 0
+	}
+	n += prefixLen(p, b.data[i:])
+	return n
+}
