@@ -128,14 +128,22 @@ func (d *dict) CopyN(w io.Writer, n int) (written int, err error) {
 // Buffered returns the number of bytes in the buffer.
 func (d *dict) Buffered() int { return d.buf.Buffered() }
 
+// Peek behaves like read but doesn't advance the reading position.
+// While not all the requested may be provided, the function never
+// returns an error.
 func (d *dict) Peek(p []byte) (n int, err error) { return d.buf.Peek(p) }
 
+// Discard skips the next n bytes to read from the buffer. The actual
+// numbers of bytes will be returned.
 func (d *dict) Discard(n int) (discarded int, err error) {
 	discarded, err = d.buf.Discard(n)
 	d.head += int64(discarded)
 	return discarded, err
 }
 
+// Read provides the standard read method for the dictionary. The
+// function might return less data than requested, but it will never
+// return an error.
 func (d *dict) Read(p []byte) (n int, err error) {
 	n, err = d.buf.Read(p)
 	d.head += int64(n)

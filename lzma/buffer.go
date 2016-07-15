@@ -90,7 +90,7 @@ func (b *buffer) Peek(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// Discard skips the n next bytes to read from the buffer, returning the
+// Discard skips the next n bytes to read from the buffer, returning the
 // bytes discarded.
 //
 // If Discards skips fewer than n bytes, it returns an error.
