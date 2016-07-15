@@ -137,19 +137,6 @@ func (b *buffer) WriteByte(c byte) error {
 	return nil
 }
 
-// prefixLen returns the length of the common prefix of a and b.
-func prefixLen(a, b []byte) int {
-	if len(a) > len(b) {
-		a, b = b, a
-	}
-	for i, c := range a {
-		if b[i] != c {
-			return i
-		}
-	}
-	return len(a)
-}
-
 // matchLen returns the length of the common prefix for the given
 // distance from the rear and the byte slice p.
 func (b *buffer) matchLen(distance int, p []byte) int {

@@ -294,10 +294,14 @@ type hcFinder struct {
 	hc *hchain
 	// word length for the hasd chain
 	n int
+	// nice length
+	niceLen int
+	// segment for which a match needs to be found
+	seg segment
 	// preallocated array; capacity is depth
 	ptrs []ptr
-	// preallocated data having the capacity of niceLen
-	data []byte
+	// preallocated word to hash
+	word []byte
 }
 
 func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
@@ -318,13 +322,14 @@ func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 		return nil, err
 	}
 	f := &hcFinder{
-		n:    n,
-		dict: dict,
-		hash: buz.MakeHash(n),
-		ht:   make([]htable, n-2),
-		hc:   newHChain(dict.buf.Cap()+1, 1<<18),
-		ptrs: make([]ptr, depth),
-		data: make([]byte, niceLen),
+		n:       n,
+		niceLen: niceLen,
+		dict:    dict,
+		hash:    buz.MakeHash(n),
+		ht:      make([]htable, n-2),
+		hc:      newHChain(dict.buf.Cap()+1, 1<<18),
+		ptrs:    make([]ptr, depth),
+		word:    make([]byte, n),
 	}
 	for i := range f.ht {
 		f.ht[i].resize(1 << (10 + 2*uint(i)))
@@ -378,16 +383,16 @@ func (f *hcFinder) Skip(n int) {
 	f.mustDiscard(f.ahead)
 	f.ahead = 0
 	for ; n > 0; n-- {
-		k, _ := f.dict.Peek(f.data[:f.n])
-		f.hash.Compute(f.data[:k])
+		k, _ := f.dict.Peek(f.word)
+		f.hash.Compute(f.word[:k])
 		f.enterHashes()
 		f.mustDiscard(1)
 	}
 }
 
 func (f *hcFinder) betterMatch(p ptr, maxLen int) (m operation, ok bool) {
-	if len(f.data) < maxLen+1 {
-		panic("called with len(f.data) < maxLen+1")
+	if f.seg.Len() < maxLen+1 {
+		panic("called with seg.Len() < maxLen+1")
 	}
 	buf := &f.dict.buf
 	dist := buf.rear - p.index()
@@ -397,10 +402,14 @@ func (f *hcFinder) betterMatch(p ptr, maxLen int) (m operation, ok bool) {
 	if !(1 <= dist && dist <= f.dict.dictLen()) {
 		return m, false
 	}
-	if f.dict.ByteAt(dist-maxLen) != f.data[maxLen] {
+	if f.dict.ByteAt(dist-maxLen) != f.dict.ByteAt(-maxLen) {
 		return m, false
 	}
-	n := buf.matchLen(dist, f.data)
+	pseg, err := f.dict.segment(dist, f.seg.Len())
+	if err != nil {
+		panic(err)
+	}
+	n := prefixLenSegments(pseg, f.seg)
 	if !(2 <= n && n <= maxMatchLen) {
 		return m, false
 	}
@@ -411,7 +420,7 @@ func (f *hcFinder) onlyfindMatches(m []operation) int {
 	if len(m) == 0 {
 		return 0
 	}
-	if len(f.data) == 0 {
+	if f.seg.Len() == 0 {
 		panic("no data")
 	}
 	var n, maxLen int
@@ -428,7 +437,7 @@ func (f *hcFinder) onlyfindMatches(m []operation) int {
 			maxLen = int(bm.len)
 			m[n] = bm
 			n++
-			if n == len(m) || len(f.data) == maxLen {
+			if n == len(m) || f.seg.Len() == maxLen {
 				return n
 			}
 		}
@@ -447,7 +456,7 @@ func (f *hcFinder) onlyfindMatches(m []operation) int {
 		maxLen = int(bm.len)
 		m[n] = bm
 		n++
-		if n == len(m) || len(f.data) == maxLen {
+		if n == len(m) || f.seg.Len() == maxLen {
 			return n
 		}
 	}
@@ -458,12 +467,13 @@ func (f *hcFinder) FindMatches(m []operation) int {
 	if f.dict.Buffered() == 0 {
 		panic(errors.New("lzma: no data buffered"))
 	}
-	k, _ := f.dict.Peek(f.data[:cap(f.data)])
-	f.data = f.data[:k]
-	if f.n < k {
-		k = f.n
+	var err error
+	f.seg, err = f.dict.segment(0, f.niceLen)
+	if err != nil {
+		panic(err)
 	}
-	f.hash.Compute(f.data[:k])
+	k, _ := f.seg.Peek(f.word)
+	f.hash.Compute(f.word[:k])
 	n := f.onlyfindMatches(m)
 	if f.ahead == 0 {
 		f.enterHashes()
