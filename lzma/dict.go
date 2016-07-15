@@ -178,9 +178,7 @@ func (s segment) Len() int {
 // might return less data then requested, but never an error.
 func (s segment) Peek(p []byte) (n int, err error) {
 	n = copy(p, s[0])
-	if n < len(p) {
-		n += copy(p[n:], s[1])
-	}
+	n += copy(p[n:], s[1])
 	return n, nil
 }
 
