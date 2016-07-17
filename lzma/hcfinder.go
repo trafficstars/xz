@@ -3,6 +3,8 @@ package lzma
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/ulikunitz/xz/internal/buz"
 )
@@ -119,13 +121,13 @@ func (h *htable) get(key uint32) (p ptr, ok bool) {
 // hcEntry describes an entry in the chain field of the hchain type.
 type hcEntry struct {
 	key  uint32
-	prev ptr
 	next ptr
 }
 
 // hchain provides a hash table with chained hashing. The table might be
 // resized during usage.
 type hchain struct {
+	dict    *dict
 	table   []ptr
 	chain   []hcEntry
 	entries int
@@ -136,7 +138,7 @@ type hchain struct {
 // newHChain creates a new instance for a hash chain. The dictSize
 // describes the complete size, dictCap + bufSize,  of the dictionary to
 // be able to address all bytes of it.
-func newHChain(dictSize int, tableLen int) *hchain {
+func newHChain(d *dict, tableLen int) *hchain {
 	if tableLen < 4 {
 		tableLen = 256
 	}
@@ -145,96 +147,123 @@ func newHChain(dictSize int, tableLen int) *hchain {
 	}
 	n := int(clp2u32(uint32(tableLen)))
 	return &hchain{
-		chain: make([]hcEntry, dictSize),
+		dict:  d,
+		chain: make([]hcEntry, len(d.buf.data)),
 		table: make([]ptr, n),
 		mask:  uint32(n - 1),
 		max:   int(load * float64(n)),
 	}
 }
 
+// dictPtr checks whether the pointer points into the dictionary. A
+// pointer to the head doesn't belong into the dictionary.
+func (h *hchain) dictPtr(p ptr) bool {
+	if p == 0 {
+		return false
+	}
+	d := h.dict.distance(p.index())
+	return 1 <= d && d <= h.dict.dictLen()
+}
+
+func (h *hchain) validPtr(p ptr) bool {
+	if p == 0 {
+		return false
+	}
+	d := h.dict.distance(p.index())
+	return 0 <= d && d <= h.dict.dictLen()
+}
+
 // resize changes the size of the hash chain.
 func (h *hchain) resize(n int) {
-	if n < 4 {
+	if n <= 255 {
 		n = 256
 	}
 	if !(1 <= n && n <= maxTableLen) {
 		panic("n out of range")
 	}
 	n = int(clp2u32(uint32(n)))
+
 	t := h.table
 	h.table = make([]ptr, n)
 	h.mask = uint32(n - 1)
 	h.max = int(load * float64(n))
 	h.entries = 0
-	for _, head := range t {
-		if head == 0 {
+	type te struct {
+		key uint32
+		p   ptr
+	}
+	tl := make([]te, 0, 16)
+	for _, p := range t {
+		if !h.validPtr(p) {
 			continue
 		}
-		e := h.chain[head.index()]
-		p := e.prev
-		tail := p
-		for {
-			e = h.chain[p.index()]
-			prev := e.prev
-			h._put(e.key, p)
-			p = prev
-			if p == tail {
+		tl := tl[:0]
+		for i := 0; ; i++ {
+			if i > len(h.chain) {
+				panic("loop")
+			}
+			e := h.chain[p.index()]
+			tl = append(tl, te{e.key, p})
+			p = e.next
+			if !h.dictPtr(p) {
 				break
 			}
 		}
-	}
-}
-
-// removes pointer from hash chain
-func (h *hchain) remove(p ptr) {
-	if p == 0 {
-		return
-	}
-	e := &h.chain[p.index()]
-	if e.next == 0 {
-		return
-	}
-	// handle head entry
-	head := &h.table[e.key&h.mask]
-	if p == *head {
-		if p != e.next {
-			*head = e.next
-		} else {
-			h.entries--
-			*head = 0
+		for i := range tl {
+			e := tl[len(tl)-1-i]
+			h._put(e.key, e.p)
 		}
 	}
-	if p != e.next {
-		eprev := &h.chain[e.prev.index()]
-		enext := &h.chain[e.next.index()]
-		eprev.next = e.next
-		enext.prev = e.prev
-	}
-	*e = hcEntry{}
 }
 
+func (h *hchain) contains(head, p ptr) bool {
+	if !h.validPtr(head) {
+		return false
+	}
+	q := head
+	for i := 0; ; i++ {
+		if i > len(h.chain) {
+			panic("loop")
+		}
+		if p == q {
+			return true
+		}
+		e := h.chain[q.index()]
+		q = e.next
+		if !h.dictPtr(q) {
+			return false
+		}
+	}
+}
+
+// _put is a helper function for putting a key into the hash chain
 func (h *hchain) _put(key uint32, p ptr) {
 	if p == 0 {
 		panic(errors.New("_put: null pointer argument"))
 	}
+	if !h.validPtr(p) {
+		panic(fmt.Errorf("_put: invalid ptr %d", p))
+	}
 	head := &h.table[key&h.mask]
+	if h.contains(*head, p) {
+		fmt.Printf("_put tidx %d ptr %d\n", key&h.mask, p)
+		h.dump(os.Stdout)
+		panic("create loop")
+	}
 	e := &h.chain[p.index()]
 	e.key = key
-	if *head == 0 {
-		e.prev, e.next = p, p
-		*head = p
+	if !h.dictPtr(*head) {
+		if *head == 0 {
+			h.entries++
+		}
+		e.next = 0
 	} else {
 		e.next = *head
-		enext := &h.chain[head.index()]
-		*head = p
-		e.prev = enext.prev
-		eprev := &h.chain[e.prev.index()]
-		enext.prev = p
-		eprev.next = p
 	}
+	*head = p
 }
 
-// put puts aan entry into the hash chain. The old chain will still
+// put puts an entry into the hash chain. The old chain will still
 // reference it, but the get function will take care of it. It assumes
 // that all entries after p in the chain are not relevant anymore.
 func (h *hchain) put(key uint32, p ptr) {
@@ -251,19 +280,21 @@ func (h *hchain) put(key uint32, p ptr) {
 		}
 		h.resize(n)
 	}
-	h.remove(p)
 	h._put(key, p)
 }
 
-// get returns the the pointers found for the key.
+// get returns the the pointers to the dictionary found for the key
 func (h *hchain) get(key uint32, ptrs []ptr) int {
-	head := h.table[key&h.mask]
-	if head == 0 {
+	p := h.table[key&h.mask]
+	// head might have distance 0
+	if !h.validPtr(p) {
 		return 0
 	}
 	n := 0
-	p := head
-	for {
+	for i := 0; ; i++ {
+		if i > len(h.chain) {
+			panic("loop")
+		}
 		e := h.chain[p.index()]
 		if e.key == key {
 			ptrs[n] = p
@@ -272,10 +303,27 @@ func (h *hchain) get(key uint32, ptrs []ptr) int {
 				return n
 			}
 		}
-		p = h.chain[p.index()].next
-		if p == head {
+		p = e.next
+		if !h.dictPtr(p) {
 			return n
 		}
+	}
+}
+
+func (h *hchain) dump(w io.Writer) {
+	for i, p := range h.table {
+		if p == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "%4d", i)
+		for p != 0 {
+			fmt.Fprintf(w, " %d", p)
+			if !h.validPtr(p) {
+				fmt.Fprint(w, "!")
+			}
+			p = h.chain[p.index()].next
+		}
+		fmt.Fprintln(w)
 	}
 }
 
@@ -322,7 +370,7 @@ func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 		dict: dict,
 		hash: buz.MakeHash(n),
 		ht:   make([]htable, n-2),
-		hc:   newHChain(dict.buf.Cap()+1, 1<<18),
+		hc:   newHChain(dict, 1<<18),
 		ptrs: make([]ptr, depth),
 		data: make([]byte, niceLen),
 	}

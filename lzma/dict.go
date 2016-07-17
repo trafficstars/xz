@@ -35,6 +35,18 @@ func newDict(dictCap, bufSize int) (d *dict, err error) {
 	return d, nil
 }
 
+// distance computes the distance to the current head for an index.
+// Indexes not in the dictionary will have a distance large then the
+// dictLen.
+func (d *dict) distance(i int) int {
+	b := &d.buf
+	k := b.rear - i
+	if k < 0 {
+		k += len(b.data)
+	}
+	return k
+}
+
 // Len returns the data available in the encoder dictionary.
 func (d *dict) Len() int {
 	n := d.buf.Available()

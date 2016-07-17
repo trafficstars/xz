@@ -1,6 +1,7 @@
 package lzma
 
 import (
+	"bytes"
 	"io"
 	"testing"
 )
@@ -26,14 +27,29 @@ func TestHTable(t *testing.T) {
 }
 
 func TestHChain(t *testing.T) {
-	hc := newHChain(2, 256)
+	dict, err := newDict(4096, 256)
+	if err != nil {
+		t.Fatalf("newDict error %s", err)
+	}
+	hc := newHChain(dict, 256)
+	dump := func() {
+		var buf bytes.Buffer
+		hc.dump(&buf)
+		t.Logf("hc dump\n%s", buf.String())
+	}
+	dict.Write([]byte("balla"))
+	dict.Discard(2)
+	dump()
 	hc.put(0, pointer(0))
+	dump()
 	hc.put(0, pointer(1))
+	dump()
 	hc.resize(512)
+	dump()
 	ptrs := make([]ptr, 4)
 	n := hc.get(0, ptrs)
 	if n != 2 {
-		t.Fatalf("hc.put(0, p) returned %d; want %d", n, 2)
+		t.Fatalf("hc.get(0, p) returned %d; want %d", n, 2)
 	}
 	ptrs = ptrs[0:n]
 	t.Log(ptrs)
