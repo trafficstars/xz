@@ -23,6 +23,8 @@
 6. Add thanks to README.md and list all developers that have reported
    problems with the library.
 
+7. Add statement how to install the library and the binary.
+
 ## Release v0.7
 
 1. Optimize code
