@@ -7,6 +7,18 @@ import "fmt"
 // that is not necessary.
 //go:generate buzgen table.go
 
+// SingleHash computes a single hash value for the given byte slice.
+func SingleHash(data []byte) uint32 {
+	if len(data) == 0 {
+		return 0
+	}
+	h := table[data[0]]
+	for _, b := range data[1:] {
+		h = (h<<1 | h>>31) ^ table[b]
+	}
+	return h
+}
+
 // Hash is slice storing the has value for lengths 2, 3, ..., len(data)
 // in a slice.
 type Hash []uint32

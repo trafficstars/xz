@@ -26,3 +26,15 @@ func TestHash(t *testing.T) {
 		t.Logf("h5[%d] %#08x", i, h)
 	}
 }
+
+func TestSingleHash(t *testing.T) {
+	s := "ball"
+	data := []byte(s)
+	h4 := MakeHash(4)
+	h4.Compute(data)
+	w := h4[2]
+	h := SingleHash(data)
+	if h != w {
+		t.Fatalf("SingleHash([]byte(%q)) is %#08x; want %#08x", s, h, w)
+	}
+}
