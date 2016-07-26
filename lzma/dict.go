@@ -47,6 +47,17 @@ func (d *dict) distance(i int) int {
 	return k
 }
 
+// dist computes the distance between indices i and j. The returned value
+// is always positive. The behaviour for indices out of range is
+// undefined.
+func (d *dict) dist(i, j int) int {
+	k := j - i
+	if k < 0 {
+		k += len(d.buf.data)
+	}
+	return k
+}
+
 // Len returns the data available in the encoder dictionary.
 func (d *dict) Len() int {
 	n := d.buf.Available()
@@ -93,6 +104,27 @@ func (d *dict) Pos() int64 { return d.head }
 // actually buffered data.
 func (d *dict) HeadByte() byte {
 	return d.buf.data[d.buf.rear]
+}
+
+// peekAt fills p with bytes from the buffer at position i. Return less
+// bytes on the front of the buffer.
+func (d *dict) peekAt(p []byte, i int) (n int, err error) {
+	b := &d.buf
+	if !(0 <= i && i < len(b.data)) {
+		return 0, errors.New("lzma: index i outside buffer")
+	}
+	n = b.front - i
+	if n <= 0 {
+		n += len(b.data)
+	}
+	if len(p) > n {
+		p = p[:n]
+	}
+	k := copy(p, b.data[i:])
+	if k < len(p) {
+		copy(p[k:], b.data)
+	}
+	return n, nil
 }
 
 // ByteAt returns the byte at the given distance.
