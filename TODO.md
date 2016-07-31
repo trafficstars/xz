@@ -4,7 +4,7 @@
 
 1. Improve hash chain finder
 
-    - improve hash chain by using single list and compute distances
+    - fix problem with enwik8
 
 2. Implement binary tree finder
 
