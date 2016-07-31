@@ -1,62 +1,39 @@
 package lzma
 
 import (
-	"bytes"
 	"io"
 	"testing"
 )
-
-func TestHTable(t *testing.T) {
-	var ht htable
-	for u := uint32(0); u < 512; u++ {
-		ht.put(u, pointer(int(u)))
-	}
-	if len(ht.table) != 1024 {
-		t.Fatalf("len(ht.table) is %d; want %d", len(ht.table), 1024)
-	}
-	for u := uint32(0); u < 512; u++ {
-		p, ok := ht.get(u)
-		if !ok {
-			t.Fatalf("get(%d) can't find a value", u)
-		}
-		w := pointer(int(u))
-		if p != w {
-			t.Fatalf("get(%d) returned %d; want %d", u, p, w)
-		}
-	}
-}
 
 func TestHChain(t *testing.T) {
 	dict, err := newDict(4096, 256)
 	if err != nil {
 		t.Fatalf("newDict error %s", err)
 	}
-	hc := newHChain(dict, 256)
-	dump := func() {
-		var buf bytes.Buffer
-		hc.dump(&buf)
-		t.Logf("hc dump\n%s", buf.String())
-	}
-	dict.Write([]byte("balla"))
+	hc := newHChain(dict, 4, 256)
+	dict.Write([]byte("ballack"))
 	dict.Discard(2)
-	dump()
-	hc.put(0, pointer(0))
-	dump()
-	hc.put(0, pointer(1))
-	dump()
-	hc.resize(512)
-	dump()
-	ptrs := make([]ptr, 4)
-	n := hc.get(0, ptrs)
-	if n != 2 {
-		t.Fatalf("hc.get(0, p) returned %d; want %d", n, 2)
+	p := make([]byte, 4)
+	var (
+		h0, h1 uint32
+		ok     bool
+	)
+	if h0, ok = hashAt(dict, p, 0); !ok {
+		t.Fatalf("hashAt index %d failed", 0)
 	}
-	ptrs = ptrs[0:n]
-	t.Log(ptrs)
-	for _, p := range ptrs {
-		if !(0 <= p.index() && p.index() <= 1) {
-			t.Fatalf("p.index() is %d; want 0 or 1", p.index())
-		}
+	if h1, ok = hashAt(dict, p, 1); !ok {
+		t.Fatalf("hashAt index %d failed", 1)
+	}
+	hc.put(h0, pointer(0))
+	hc.put(h1, pointer(1))
+	hc.resize(512)
+	ptrs := make([]ptr, 4)
+	n := hc.get(h0, ptrs)
+	if n != 1 {
+		t.Fatalf("hc.get(%#08x, p) returned %d; want %d", h0, n, 1)
+	}
+	if ptrs[0] != pointer(0) {
+		t.Fatalf("ptrs[0] is %d; want %d", ptrs[0], pointer(0))
 	}
 }
 
