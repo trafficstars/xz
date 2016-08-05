@@ -1,10 +1,37 @@
 package lzma
 
 import (
-	"io"
 	"testing"
 )
 
+func TestHTable(t *testing.T) {
+	dict, err := newDict(4096, 256)
+	if err != nil {
+		t.Fatalf("newDict error %s", err)
+	}
+	ht := newHTable(2<<16, dict)
+	dict.Write([]byte("ballack"))
+	dict.Discard(2)
+	ht.put(0, 10)
+	ht.put(12, 11)
+	check := func(key uint32, off int64) {
+		o, ok := ht.get(key)
+		if !ok {
+			t.Fatalf("get(%d) returns no value; want %d", key, off)
+		}
+		if o != off {
+			t.Fatalf("get(%d) returns %d; want %d", key, o, off)
+		}
+	}
+	check(0, 10)
+	check(12, 11)
+	ht.rebase()
+	t.Log("rebased")
+	check(0, 10)
+	check(12, 11)
+}
+
+/*
 func TestHChain(t *testing.T) {
 	dict, err := newDict(4096, 256)
 	if err != nil {
@@ -36,6 +63,7 @@ func TestHChain(t *testing.T) {
 		t.Fatalf("ptrs[0] is %d; want %d", ptrs[0], pointer(0))
 	}
 }
+*/
 
 const example = `LZMA decoder test example
 =========================
@@ -51,6 +79,7 @@ const example = `LZMA decoder test example
 =========================
 `
 
+/*
 func TestHCFinder(t *testing.T) {
 	const depth = 20
 	f, err := newHCFinder(4, 4096, 4096, 200, depth)
@@ -96,3 +125,4 @@ func TestHCFinder(t *testing.T) {
 	}
 	t.Logf("len(f.hc.table) %d", len(f.hc.table))
 }
+*/

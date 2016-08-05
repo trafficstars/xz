@@ -127,6 +127,18 @@ func (d *dict) peekAt(p []byte, i int) (n int, err error) {
 	return n, nil
 }
 
+func (d *dict) indexOff(off int64) (i int, ok bool) {
+	dist := d.head - off
+	if !(0 <= dist && dist <= int64(d.dictLen())) {
+		return 0, false
+	}
+	i = d.buf.rear - int(dist)
+	if i < 0 {
+		i += len(d.buf.data)
+	}
+	return i, true
+}
+
 // index returns the index of the byte for the given distance. No result
 // will be provided if distance is out of range.
 func (d *dict) index(distance int) (i int, ok bool) {

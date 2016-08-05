@@ -14,283 +14,170 @@ const (
 	maxTableLen = 1 << 26
 )
 
-// load provides the limit for the load of a hash table. Is the load
-// higher the table size will be doubled.
-const load float64 = 0.75
+type base struct{ o int64 }
 
-// ptr is a reference to the actual dictionary. Since we need a zero
-// value for an uninitialized pointer, we increase index values by 1.
-type ptr uint32
+func (b base) off(u uint32) int64 { return b.o + int64(u) }
 
-// pointer converts an index into a pointer. The pointer returned is
-// never null.
-func pointer(idx int) ptr {
-	if !(0 <= idx && int64(idx) < maxUint32) {
-		panic("index out of range")
+func (b base) short(off int64) uint32 {
+	n := off - b.o
+	if !(0 < n && n < 1<<32) {
+		panic("offset out of range")
 	}
-	return ptr(idx + 1)
-}
-
-// index returns the index value of the pointer. The function panics if
-// called for a zero value pointer.
-func (p ptr) index() int {
-	if p == 0 {
-		panic("no index for null pointer")
-	}
-	return int(p - 1)
-}
-
-// hash computes the hash at the index using the slice p.
-func hashAt(d *dict, p []byte, index int) (h uint32, ok bool) {
-	n, err := d.peekAt(p, index)
-	if err != nil {
-		return 0, false
-	}
-	if n < len(p) {
-		return 0, false
-	}
-	h = buz.SingleHash(p)
-	return h, true
+	return uint32(n)
 }
 
 // htable provides a simple hash table. Old values for the same slot
 // will be forgotten.
 type htable struct {
-	dict       *dict
-	table      []ptr
-	entries    int
-	maxEntries int
-	mask       uint32
-	// preallocated
-	data []byte
+	dict  *dict
+	table []uint32
+	mask  uint32
+	base  base
 }
 
 // newHTable creates new htable instance.
-func newHTable(d *dict, wordLen int) *htable {
-	return &htable{dict: d, data: make([]byte, wordLen)}
+func newHTable(size int, d *dict) *htable {
+	if size > d.capacity {
+		size = d.capacity
+	}
+	size = int(clp2u32(uint32(size)))
+	return &htable{
+		dict:  d,
+		table: make([]uint32, size),
+		mask:  uint32(size - 1),
+		base:  base{-1},
+	}
 }
 
-// resize changes the size of the table. While it is possible to
-// decrease the size of an hash table, expect the hash table to lose
-// entries and a resize during the next put call.
-func (h *htable) resize(n int) {
-	if n == 0 {
-		*h = htable{dict: h.dict, data: h.data}
+func (h *htable) rebase() {
+	// We need to limit the maximum dictionary length to limit the
+	// number of rebase steps.
+	const max = 3 << 30
+	c := int64(h.dict.dictLen())
+	if c > max {
+		c = max
+	}
+	b := h.dict.head - c - 1
+	delta64 := b - h.base.o
+	switch {
+	case delta64 < 0:
+		panic("decreasing base unexpected")
+	case delta64 == 0:
 		return
+	case delta64 >= 1<<32:
+		panic("delta too large")
 	}
-	if !(1 <= n && n <= maxTableLen) {
-		panic("n out of range")
-	}
-	n = int(clp2u32(uint32(n)))
-	t := h.table
-	h.table = make([]ptr, n)
-	h.mask = uint32(n - 1)
-	h.maxEntries = int(load * float64(n))
-	h.entries = 0
-	for _, p := range t {
-		if p == 0 {
+	delta := uint32(delta64)
+	h.base.o = b
+	for i, u := range h.table {
+		if u == 0 {
 			continue
 		}
-		key, ok := hashAt(h.dict, h.data, p.index())
-		if !ok {
-			continue
-		}
-		pp := &h.table[key&h.mask]
-		if *pp != 0 {
-			a := h.dict.distance(p.index())
-			b := h.dict.distance(pp.index())
-			if a > b {
-				continue
-			}
-		} else {
-			h.entries++
-		}
-		*pp = p
+		h.table[i] = dozu32(u, delta)
 	}
 }
 
 // put makes an entry in the hash table. The table might be resized by the
 // function. The old entry in the slot might be overwritten.
-func (h *htable) put(key uint32, p ptr) {
-	if p == 0 {
-		panic("null pointer not supported")
+func (h *htable) put(key uint32, off int64) {
+	// check for rebase
+	if h.base.o+(1<<32) <= off {
+		h.rebase()
 	}
-	if h.entries >= h.maxEntries && len(h.table) <= maxTableLen>>1 {
-		var n int
-		if len(h.table) == 0 {
-			n = 256
-		} else {
-			n = 2 * len(h.table)
-		}
-		h.resize(n)
-	}
-	pp := &h.table[key&h.mask]
-	if *pp == 0 {
-		h.entries++
-	}
-	*pp = p
+	h.table[key&h.mask] = h.base.short(off)
 }
 
-// get returns the pointer for key if available.
-func (h *htable) get(key uint32) (p ptr, ok bool) {
-	if len(h.table) == 0 {
+// get returns the offset for the given key.
+func (h *htable) get(key uint32) (off int64, ok bool) {
+	u := h.table[key&h.mask]
+	if u == 0 {
 		return 0, false
 	}
-	p = h.table[key&h.mask]
-	return p, p != 0
+	return h.base.off(u), true
 }
 
 // hchain provides a hash table with chained hashing. The table might be
 // resized during usage.
 type hchain struct {
-	dict       *dict
-	table      []ptr
-	chain      []uint32
-	entries    int
-	maxEntries int
-	mask       uint32
-	// preallocated slice
-	data []byte
+	htable
+	chain []uint32
 }
 
 // newHChain creates a new instance for a hash chain.
-func newHChain(d *dict, wordLen, tableLen int) *hchain {
-	if tableLen < 4 {
-		tableLen = 256
-	}
-	if !(1 <= tableLen && tableLen <= maxTableLen) {
-		panic("tableLen out of range")
-	}
-	n := int(clp2u32(uint32(tableLen)))
+func newHChain(size int, d *dict) *hchain {
 	return &hchain{
-		dict:       d,
-		chain:      make([]uint32, len(d.buf.data)),
-		table:      make([]ptr, n),
-		mask:       uint32(n - 1),
-		maxEntries: int(load * float64(n)),
-		data:       make([]byte, wordLen),
+		htable: *newHTable(size, d),
+		chain:  make([]uint32, len(d.buf.data)),
 	}
 }
 
-func validPtr(dict *dict, p ptr) bool {
-	if p == 0 {
-		return false
+func (h *hchain) put(key uint32, off int64) {
+	// TODO: are we putting here the head all the time
+	i, ok := h.dict.indexOff(off)
+	if !ok {
+		panic("offset not inside dictionary")
 	}
-	d := dict.distance(p.index())
-	return 0 <= d && d <= dict.dictLen()
+	if h.base.o+(1<<32) <= off {
+		h.rebase()
+	}
+	p := &h.table[key&h.mask]
+	u := *p
+	*p = h.base.short(off)
+	p = &h.chain[i]
+	if u == 0 {
+		*p = 0
+		return
+	}
+	delta := off - h.base.off(u)
+	if delta < 0 {
+		panic("negative delta")
+	}
+	if delta >= int64(h.dict.capacity) {
+		*p = 0
+		return
+	}
+	*p = uint32(delta)
 }
 
-// resize changes the size of the hash chain.
-func (h *hchain) resize(n int) {
-	if n <= 255 {
-		n = 256
-	}
-	if !(1 <= n && n <= maxTableLen) {
-		panic("n out of range")
-	}
-	n = int(clp2u32(uint32(n)))
-
-	t := h.table
-	h.table = make([]ptr, n)
-	h.mask = uint32(n - 1)
-	h.maxEntries = int(load * float64(n))
-	h.entries = 0
-	idx := make([]int, 0, 16)
-	for _, p := range t {
-		if !validPtr(h.dict, p) {
-			continue
-		}
-		i := p.index()
-		dist := h.dict.distance(i)
-		if dist > h.dict.dictLen() {
-			continue
-		}
-		idx = append(idx[:0], i)
-		for k := 1; ; k++ {
-			delta := int(h.chain[i])
-			if delta <= 0 {
-				break
-			}
-			dist += delta
-			var ok bool
-			if i, ok = h.dict.index(dist); !ok {
-				break
-			}
-			idx = append(idx, i)
-		}
-		for k := range idx {
-			i = idx[len(idx)-1-k]
-			key, ok := hashAt(h.dict, h.data, i)
-			if !ok {
-				panic(fmt.Errorf(
-					"hashAt unsuccessful at index %d", i))
-			}
-			h._put(key, pointer(i))
-		}
-	}
-}
-
-// _put is a helper function for putting a key into the hash chain
-func (h *hchain) _put(key uint32, p ptr) {
-	if p == 0 {
-		panic(errors.New("_put: null pointer argument"))
-	}
-	if !validPtr(h.dict, p) {
-		panic(fmt.Errorf("_put: invalid ptr %d", p))
-	}
-	i := p.index()
-	pp := &h.table[key&h.mask]
-	delta := 0
-	if *pp != 0 {
-		h.entries++
-		delta = h.dict.dist(pp.index(), i)
-	}
-	*pp = p
-	h.chain[i] = uint32(delta)
-}
-
-// put puts an entry into the hash chain. The old chain will still
-// reference it, but the get function will take care of it. It assumes
-// that all entries after p in the chain are not relevant anymore.
-func (h *hchain) put(key uint32, p ptr) {
-	if h.entries >= h.maxEntries && len(h.table) <= maxTableLen>>1 {
-		// resize table
-		var n int
-		if len(h.table) == 0 {
-			n = 256
-		} else {
-			n = 2 * len(h.table)
-		}
-		h.resize(n)
-	}
-	h._put(key, p)
-}
-
-// get returns the the pointers to the dictionary found for the key
-func (h *hchain) get(key uint32, ptrs []ptr) int {
-	p := h.table[key&h.mask]
-	// head might have distance 0
-	if !validPtr(h.dict, p) {
+// get returns the distances found for the key. It is not checked of
+// distances actually matcht the key.
+func (h *hchain) get(key uint32, distances []int) int {
+	u := h.table[key&h.mask]
+	if u == 0 {
 		return 0
 	}
-	i := p.index()
-	dist := h.dict.distance(i)
-	n := 0
-	for n < len(ptrs) {
-		ptrs[n] = p
-		n++
-		delta := int(h.chain[i])
-		if delta <= 0 {
-			break
-		}
-		dist += delta
-		var ok bool
-		if i, ok = h.dict.index(dist); !ok {
-			break
-		}
-		p = pointer(i)
+	off := h.base.off(u)
+	i, ok := h.dict.indexOff(off)
+	if !ok {
+		return 0
 	}
-	return n
+	dictLen := int64(h.dict.dictLen())
+	dist := h.dict.head - off
+	if !(0 <= dist && dist <= dictLen) {
+		return 0
+	}
+	dataLen := len(h.dict.buf.data)
+	n := 0
+	for {
+		distances[n] = int(dist)
+		n++
+		if n >= len(distances) {
+			return n
+		}
+		delta := h.chain[i]
+		if delta == 0 {
+			return n
+		}
+		dist += int64(delta)
+		if dist > dictLen {
+			h.chain[i] = 0
+			return n
+		}
+		i -= int(delta)
+		if i < 0 {
+			i += dataLen
+		}
+	}
 }
 
 type hcFinder struct {
@@ -306,10 +193,10 @@ type hcFinder struct {
 	ht []*htable
 	// table of hash entries
 	hc *hchain
-	// word length for the hasd chain
+	// word length for the hash chain
 	n int
 	// preallocated array; capacity is depth
-	ptrs []ptr
+	distances []int
 	// preallocated data having the capacity of niceLen
 	data []byte
 }
@@ -332,17 +219,25 @@ func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 		return nil, err
 	}
 	f := &hcFinder{
-		n:    n,
-		dict: dict,
-		hash: buz.MakeHash(n),
-		ht:   make([]*htable, n-2),
-		hc:   newHChain(dict, n, 1<<18),
-		ptrs: make([]ptr, depth),
-		data: make([]byte, niceLen),
+		n:         n,
+		dict:      dict,
+		hash:      buz.MakeHash(n),
+		ht:        make([]*htable, n-2),
+		hc:        newHChain(1<<27, dict),
+		distances: make([]int, depth),
+		data:      make([]byte, niceLen),
 	}
 	for i := range f.ht {
-		f.ht[i] = newHTable(dict, i+2)
-		f.ht[i].resize(1 << (10 + 2*uint(i)))
+		var size int
+		switch i + 2 {
+		case 2:
+			size = 1 << 16
+		case 3:
+			size = 1 << 24
+		default:
+			size = 1 << 26
+		}
+		f.ht[i] = newHTable(size, dict)
 	}
 	return f, nil
 }
@@ -352,7 +247,7 @@ func (f *hcFinder) Dict() *dict {
 }
 
 func (f *hcFinder) Depth() int {
-	return cap(f.ptrs)
+	return cap(f.distances)
 }
 
 func (f *hcFinder) mustDiscard(n int) {
@@ -368,11 +263,11 @@ func (f *hcFinder) mustDiscard(n int) {
 
 func (f *hcFinder) enterHashes() {
 	for i, h := range f.hash {
-		p := pointer(f.dict.buf.rear)
+		off := f.dict.head
 		if i < f.n-2 {
-			f.ht[i].put(h, p)
+			f.ht[i].put(h, off)
 		} else {
-			f.hc.put(h, p)
+			f.hc.put(h, off)
 		}
 	}
 }
@@ -400,12 +295,11 @@ func (f *hcFinder) Skip(n int) {
 	}
 }
 
-func (f *hcFinder) betterMatch(p ptr, maxLen int) (m operation, ok bool) {
+func (f *hcFinder) betterMatch(dist int, maxLen int) (m operation, ok bool) {
 	if len(f.data) < maxLen+1 {
 		panic("called with len(f.data) < maxLen+1")
 	}
 	buf := &f.dict.buf
-	dist := buf.rear - p.index()
 	if dist < 0 {
 		dist += len(buf.data)
 	}
@@ -433,10 +327,10 @@ func (f *hcFinder) onlyfindMatches(m []operation) int {
 	hi := len(f.hash) - 1
 	if hi+2 == f.n {
 		// search hash chain
-		k := f.hc.get(f.hash[hi], f.ptrs)
+		k := f.hc.get(f.hash[hi], f.distances)
 		hi--
-		for _, p := range f.ptrs[:k] {
-			bm, ok := f.betterMatch(p, maxLen)
+		for _, dist := range f.distances[:k] {
+			bm, ok := f.betterMatch(dist, maxLen)
 			if !ok {
 				continue
 			}
@@ -451,11 +345,11 @@ func (f *hcFinder) onlyfindMatches(m []operation) int {
 	for ; hi >= 0; hi-- {
 		// search the hash tables for the smaller hash lengths
 		ht := f.ht[hi]
-		p, ok := ht.get(f.hash[hi])
+		off, ok := ht.get(f.hash[hi])
 		if !ok {
 			continue
 		}
-		bm, ok := f.betterMatch(p, maxLen)
+		bm, ok := f.betterMatch(int(f.dict.head-off), maxLen)
 		if !ok {
 			continue
 		}

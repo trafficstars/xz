@@ -46,6 +46,14 @@ func nlz32(x uint32) int {
 	return 32 - int(ntz32Table[x>>27])
 }
 
+// dozu32 returns zero if x <= y and otherwise the difference x-y.
+func dozu32(x, y uint32) uint32 {
+	if x <= y {
+		return 0
+	}
+	return x - y
+}
+
 // clp2u32 rounds up to the next power of 2.
 func clp2u32(x uint32) uint32 {
 	x--
