@@ -21,5 +21,6 @@ cmd/xb/xb
 # executables on windows
 *.exe
 
-# default compression test file
+# preferred compression test files
 enwik8*
+mozilla*
