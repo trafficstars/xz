@@ -14,10 +14,15 @@ const (
 	maxTableLen = 1 << 26
 )
 
+// Base represents the offset base for the uint32 truncated offset
+// values stored in the hash tables. Note that the truncated value 0
+// is interpreted a no offset instead of offset zero.
 type base struct{ o int64 }
 
+// off returns the full offset for the truncated offset.
 func (b base) off(u uint32) int64 { return b.o + int64(u) }
 
+// short converts an offset into a truncacted value.
 func (b base) short(off int64) uint32 {
 	n := off - b.o
 	if !(0 < n && n < 1<<32) {
@@ -43,12 +48,19 @@ func newHTable(size int, d *dict) *htable {
 	size = int(clp2u32(uint32(size)))
 	return &htable{
 		dict:  d,
+		// hash table of truncated offset values; zero entries
+		// mean no offset stored
 		table: make([]uint32, size),
 		mask:  uint32(size - 1),
+		// base -1 makes truncated offset 1 offset 0
 		base:  base{-1},
 	}
 }
 
+// rebase shifts the base. All non-zero truncated offsets in the hash
+// table will be recomputed. For extremely large dictionary capacities
+// the shift will be smaller than the dictionary capacity to limit the
+// number of rebases required.
 func (h *htable) rebase() {
 	// We need to limit the maximum dictionary length to limit the
 	// number of rebase steps.
@@ -77,8 +89,8 @@ func (h *htable) rebase() {
 	}
 }
 
-// put makes an entry in the hash table. The table might be resized by the
-// function. The old entry in the slot might be overwritten.
+// put makes an entry in the hash table. Old entries will be
+// overwritten. If necessary the truncated offsets will be rebased.
 func (h *htable) put(key uint32, off int64) {
 	// check for rebase
 	if h.base.o+(1<<32) <= off {
@@ -180,6 +192,8 @@ func (h *hchain) get(key uint32, distances []int) int {
 	}
 }
 
+// hcFinder provides find matcher that is based on hash tables using
+// simple chaining.
 type hcFinder struct {
 	// dictionary providing Write, Pos, ByteAt and CopyN
 	dict *dict
@@ -201,6 +215,8 @@ type hcFinder struct {
 	data []byte
 }
 
+// newHCFinder creates a new instanse of a hash chain finder. n is the
+// word length by the largest hash table.
 func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 ) (hc *hcFinder, err error) {
 	if n < 2 {
@@ -242,14 +258,18 @@ func newHCFinder(n int, dictCap int, bufSize int, niceLen int, depth int,
 	return f, nil
 }
 
+// Dict returns the dictionary.
 func (f *hcFinder) Dict() *dict {
 	return f.dict
 }
 
+// Depth returns the depth applied by the hash finder.
 func (f *hcFinder) Depth() int {
 	return cap(f.distances)
 }
 
+// mustDiscard forwards the head. All issue will be noted as panics. For
+// purists those panics are not supposed to happens and are bugs. 
 func (f *hcFinder) mustDiscard(n int) {
 	discarded, err := f.dict.Discard(n)
 	if err != nil {
@@ -261,6 +281,7 @@ func (f *hcFinder) mustDiscard(n int) {
 	}
 }
 
+// enters the current set of hash values into the hash tables.
 func (f *hcFinder) enterHashes() {
 	for i, h := range f.hash {
 		off := f.dict.head
@@ -272,6 +293,8 @@ func (f *hcFinder) enterHashes() {
 	}
 }
 
+// Skip skips over n byte of input. Bytes are added to the dictionary
+// and hashes are still computed.
 func (f *hcFinder) Skip(n int) {
 	if n < 0 {
 		panic("lzma: can't skip negative number of bytes")
@@ -295,6 +318,8 @@ func (f *hcFinder) Skip(n int) {
 	}
 }
 
+// betterMatch checks whether there is a match that is greater than
+// maxLen on the given distance.
 func (f *hcFinder) betterMatch(dist int, maxLen int) (m operation, ok bool) {
 	if len(f.data) < maxLen+1 {
 		panic("called with len(f.data) < maxLen+1")
@@ -316,6 +341,8 @@ func (f *hcFinder) betterMatch(dist int, maxLen int) (m operation, ok bool) {
 	return match(uint32(dist), n), true
 }
 
+// onlyFindMatches searches only for matches and doesn't extend the
+// dictionary.
 func (f *hcFinder) onlyfindMatches(m []operation) int {
 	if len(m) == 0 {
 		return 0
@@ -363,6 +390,11 @@ func (f *hcFinder) onlyfindMatches(m []operation) int {
 	return n
 }
 
+// FindMatches finds for the current position and returns them in the
+// given array. The number of matches entered into m are returned. The
+// matches in the slice will have increasing lengths. The dictionary
+// will be moved by one byte and hashes for the head position will be
+// entered into the dictionary.
 func (f *hcFinder) FindMatches(m []operation) int {
 	if f.dict.Buffered() == 0 {
 		panic(errors.New("lzma: no data buffered"))
