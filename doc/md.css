@@ -1,10 +1,16 @@
 /* md.css */
 
 body {
-	font-family: "Verdana", sans-serif;
-	font-size: 10pt;
-	width: 60em;
-	background-color: #FFFAF0;
+	font-family: "Tahoma", sans-serif;
+	font-size: 12pt;
+	width: 40em;
+	background-color: #FFFFFF;
+}
+
+pre {
+	border-radius: 3px;
+	padding: 10px 10px 10px 10px;
+	background-color: #FFECB3;
 }
 
 h1 { font-size: 18pt; }
