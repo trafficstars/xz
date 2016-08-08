@@ -23,10 +23,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("xz.NewWriter error %s", err)
 	}
-	if _, err := io.WriteString(w, text); err != nil {
+	if _, err = io.WriteString(w, text); err != nil {
 		log.Fatalf("WriteString error %s", err)
 	}
-	if err := w.Close(); err != nil {
+	if err = w.Close(); err != nil {
 		log.Fatalf("w.Close error %s", err)
 	}
 	// decompress buffer and write output to stdout
