@@ -379,8 +379,5 @@ func (bw *blockWriter) Close() error {
 	k := padLen(bw.cxz.n)
 	p := make([]byte, k+s)
 	bw.hash.Sum(p[k:k])
-	if _, err := bw.cxz.w.Write(p); err != nil {
-		return err
-	}
-	return nil
+	return bw.cxz.w.Write(p)
 }
