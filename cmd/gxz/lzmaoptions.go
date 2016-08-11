@@ -407,10 +407,7 @@ func (o *lzmaOptions) Set(name, arg string) error {
 	opts.IntVar(&o.niceLen, "nice", o.niceLen)
 	opts.IntVar(&o.depth, "depth", o.depth)
 	opts.SetAction("preset", func(*option) { o.applyPreset(o.preset) })
-	if err := opts.Parse(arg); err != nil {
-		return err
-	}
-	return nil
+	return opts.Parse(arg)
 }
 
 func (o *lzmaOptions) Update() {
