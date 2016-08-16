@@ -2,28 +2,24 @@
 
 ## Release v0.6
 
-1. Improve hash chain finder
-
-    - fix problem with enwik8
-
-2. Implement binary tree finder
+1. Implement binary tree finder
 
     - implement bt2-bt4 as well
 
-3. Support parameters in gxz tool.
+2. Support parameters in gxz tool.
 
-   -> Support presets in the package.
+   - Support presets in the package.
 
-4. Compare compression ratio with xz tool using comparable parameters
+3. Compare compression ratio with xz tool using comparable parameters
    and optimize parameters
 
-5. Do some optimizations
+4. Do some optimizations
     - rename operation action and make it a simple type of size 8
 
-6. Add thanks to README.md and list all developers that have reported
+5. Add thanks to README.md and list all developers that have reported
    problems with the library.
 
-7. Add statement how to install the library and the binary.
+6. Add statement how to install the library and the binary.
 
 ## Release v0.7
 
@@ -35,10 +31,11 @@
 
 ## Release v0.8
 
-1. Support parallel go routines for writing and reading xz files.
-2. Support a ReaderAt interface for xz files with small block sizes.
-3. Improve compatibility between gxz and xz
-4. Provide manual page for gxz
+1. Support context in gxz
+2. Support parallel go routines for writing and reading xz files.
+3. Support a ReaderAt interface for xz files with small block sizes.
+4. Improve compatibility between gxz and xz
+5. Provide manual page for gxz
 
 ## Release v0.9
 
