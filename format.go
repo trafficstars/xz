@@ -550,7 +550,7 @@ func readFilter(r io.Reader) (f filter, err error) {
 
 // readFilters reads count filters. At this point in time only the count
 // 1 is supported.
-func readFilters(r io.Reader, count int) (filters []filter, err error) {
+func readFilters(r io.Reader, count int) ([]filter, error) {
 	if count != 1 {
 		return nil, errors.New("xz: unsupported filter count")
 	}
