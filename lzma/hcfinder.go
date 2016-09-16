@@ -40,13 +40,13 @@ func newHTable(size int, d *dict) *htable {
 	}
 	size = int(clp2u32(uint32(size)))
 	return &htable{
-		dict:  d,
+		dict: d,
 		// hash table of truncated offset values; zero entries
 		// mean no offset stored
 		table: make([]uint32, size),
 		mask:  uint32(size - 1),
 		// base -1 makes truncated offset 1 offset 0
-		base:  base{-1},
+		base: base{-1},
 	}
 }
 
@@ -262,7 +262,7 @@ func (f *hcFinder) Depth() int {
 }
 
 // mustDiscard forwards the head. All issue will be noted as panics. For
-// purists those panics are not supposed to happens and are bugs. 
+// purists: These panics are not supposed to happen and are bugs.
 func (f *hcFinder) mustDiscard(n int) {
 	discarded, err := f.dict.Discard(n)
 	if err != nil {
