@@ -7,13 +7,6 @@ import (
 	"github.com/ulikunitz/xz/internal/buz"
 )
 
-// Maximal values. The maximum table length results in a 512 MiB table field
-// for type htable and a 256 MiB table for type hchain.
-const (
-	maxUint32   = 1<<32 - 1
-	maxTableLen = 1 << 26
-)
-
 // Base represents the offset base for the uint32 truncated offset
 // values stored in the hash tables. Note that the truncated value 0
 // is interpreted a no offset instead of offset zero.
