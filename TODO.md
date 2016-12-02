@@ -88,12 +88,24 @@
 
 ## Log
 
+### 2016-12-02
+
+Release v0.5.2 became necessary to allow the decoding of xz files with
+4-byte padding in the block header. Many thanks to Greg, who reported
+the issue.
+
 ### 2016-07-14
 
 Changed the MatchFinder interface and created a new HashChain
 implementation. The code works again and the compression ration should
 have gone up. Compression speed decreases but I believe I can fix that
 again.
+
+### 2016-07-23 
+
+Release v0.5.1 became necessary to fix problems with 32-bit platforms.
+Many thanks to Bruno Brigas, who reported the issue.
+>>>>>>> master
 
 ### 2016-07-04
 
