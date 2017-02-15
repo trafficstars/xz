@@ -65,7 +65,7 @@ func NewReader2Cfg(lzma2 io.Reader, cfg Reader2Config) (r *Reader2, err error) {
 		return nil, err
 	}
 	if err = r.startChunk(); err != nil {
-		return nil, err
+		r.err = err
 	}
 	return r, nil
 }
