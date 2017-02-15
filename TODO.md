@@ -21,15 +21,14 @@
     - rename operation action and make it a simple type of size 8
 
 4. Add thanks to README.md and list all developers that have reported
-   problems with the library.
+   problems with the library to CONTRIBUTORS.md.
 
 ## Release v0.7
 
 1. Optimize code
 2. Do statistical analysis to get linear presets.
-
 3. Test sync.Pool compatability for xz and lzma Writer and Reader
-3. Fuzz optimized code.
+4. Fuzz optimized code.
 
 ## Release v0.8
 
