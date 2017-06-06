@@ -410,13 +410,19 @@ func (h *blockHeader) UnmarshalBinary(data []byte) error {
 	// Since headerLen is a multiple of 4 we don't need to check
 	// alignment.
 	k := r.Len()
-	// The standard spec says that the padding should have not more
-	// than 3 bytes. However we found paddings of 4 or 5 in the
-	// wild. See https://github.com/ulikunitz/xz/pull/11 and
-	// https://github.com/ulikunitz/xz/issues/15
+	// There is no need to test the padding length here. The
+	// standard says there will be as much padding as required to
+	// support the header length given.
 	//
-	// The only reasonable approach seems to be to ignore the
-	// padding size. We still check that all padding bytes are zero.
+	// 3.1.6. Header Padding
+	//
+	// This field contains as many null byte as it is needed to make
+	// the Block Header have the size specified in Block Header Size.
+	// If any of the bytes are not null bytes, the decoder MUST
+	// indicate an error. It is possible that there is a new field
+	// present which the decoder is not aware of, and can thus parse
+	// the Block Header incorrectly.
+	//
 	if !allZeros(data[n-k : n]) {
 		return errPadding
 	}
