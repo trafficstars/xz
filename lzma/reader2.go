@@ -1,4 +1,4 @@
-// Copyright 2014-2016 Ulrich Kunitz. All rights reserved.
+// Copyright 2014-2017 Ulrich Kunitz. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -65,7 +65,7 @@ func NewReader2Cfg(lzma2 io.Reader, cfg Reader2Config) (r *Reader2, err error) {
 		return nil, err
 	}
 	if err = r.startChunk(); err != nil {
-		return nil, err
+		r.err = err
 	}
 	return r, nil
 }

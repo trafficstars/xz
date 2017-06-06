@@ -1,6 +1,6 @@
 package main
 
-const goLicense = `Copyright (c) 2012 The Go Authors. All rights reserved.
+const goLicense = `Copyright (c) 2009 The Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `
-const xzLicense = `Copyright (c) 2014-2016  Ulrich Kunitz
+const xzLicense = `Copyright (c) 2014-2017  Ulrich Kunitz
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

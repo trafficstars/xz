@@ -1,4 +1,4 @@
-// Copyright 2014-2016 Ulrich Kunitz. All rights reserved.
+// Copyright 2014-2017 Ulrich Kunitz. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -410,9 +410,13 @@ func (h *blockHeader) UnmarshalBinary(data []byte) error {
 	// Since headerLen is a multiple of 4 we don't need to check
 	// alignment.
 	k := r.Len()
-	if k > 3 {
-		return errors.New("xz: unexpected padding size")
-	}
+	// The standard spec says that the padding should have not more
+	// than 3 bytes. However we found paddings of 4 or 5 in the
+	// wild. See https://github.com/ulikunitz/xz/pull/11 and
+	// https://github.com/ulikunitz/xz/issues/15
+	//
+	// The only reasonable approach seems to be to ignore the
+	// padding size. We still check that all padding bytes are zero.
 	if !allZeros(data[n-k : n]) {
 		return errPadding
 	}
